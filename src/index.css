@@ -1,0 +1,239 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-ink-950 text-slate-200 font-sans antialiased;
+    background-image:
+      radial-gradient(900px 500px at 12% -10%, rgba(99, 102, 241, 0.16), transparent 60%),
+      radial-gradient(800px 500px at 92% 0%, rgba(168, 85, 247, 0.12), transparent 55%);
+    background-attachment: fixed;
+  }
+
+  ::selection {
+    @apply bg-brand-500/40 text-white;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-white/10;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-white/20;
+    background-clip: content-box;
+  }
+}
+
+@layer components {
+  .card {
+    @apply relative rounded-2xl border border-white/10 bg-white/[0.035] shadow-card backdrop-blur-sm;
+  }
+
+  /* A one-pixel highlight along the top edge only. Real glass catches light
+     where it faces the source, so lighting all four borders equally is what
+     makes flat "glassmorphism" read as a grey box. */
+  .card::before {
+    @apply pointer-events-none absolute inset-x-0 top-0 h-px rounded-t-2xl;
+    content: '';
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.14) 30%, rgba(255, 255, 255, 0.14) 70%, transparent);
+  }
+
+  .card-hover {
+    @apply transition duration-200 hover:-translate-y-px hover:border-white/20 hover:bg-white/[0.06] hover:shadow-lift;
+  }
+
+  /* Gradient border: the ring lives on a parent whose padding is the stroke.
+     border-image cannot do rounded corners, so this is the way to get one. */
+  .card-grad {
+    @apply relative rounded-2xl p-px;
+    background: linear-gradient(140deg, rgba(129, 140, 248, 0.45), rgba(168, 85, 247, 0.18) 40%, rgba(255, 255, 255, 0.06) 70%);
+  }
+  .card-grad > * {
+    @apply rounded-[15px] bg-ink-950/85;
+  }
+
+  .btn {
+    @apply inline-flex select-none items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold
+           transition duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/70
+           focus-visible:ring-offset-2 focus-visible:ring-offset-ink-950 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply btn relative overflow-hidden bg-gradient-to-r from-brand-600 to-accent text-white shadow-glow hover:from-brand-500 hover:to-fuchsia-500 active:scale-[.98];
+  }
+
+  /* A light sweep across the primary button on hover. Purely decorative, so it
+     is pointer-events-none and never intercepts the click it decorates. */
+  .btn-primary::after {
+    @apply pointer-events-none absolute inset-y-0 -left-full w-1/3 skew-x-[-20deg] bg-white/25 opacity-0;
+    content: '';
+  }
+  .btn-primary:hover::after {
+    @apply animate-sweep opacity-100;
+  }
+
+  .btn-ghost {
+    @apply btn border border-white/10 bg-white/[0.04] text-slate-200 hover:border-white/20 hover:bg-white/[0.09];
+  }
+
+  .btn-sm {
+    @apply px-3 py-1.5 text-xs;
+  }
+
+  .input {
+    @apply w-full rounded-xl border border-white/10 bg-ink-900/70 px-4 py-3 text-sm text-slate-100
+           placeholder:text-slate-500 transition focus:border-brand-500/60 focus:outline-none
+           focus:ring-4 focus:ring-brand-500/10;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide;
+  }
+
+  .label {
+    @apply text-[11px] font-semibold uppercase tracking-[.14em] text-slate-500;
+  }
+
+  .grad-text {
+    @apply bg-gradient-to-r from-brand-200 via-white to-fuchsia-200 bg-clip-text text-transparent;
+  }
+
+  .divide-row > * + * {
+    @apply border-t border-white/[0.06];
+  }
+
+  /* Keyboard key, for the shortcut hints in the command palette. */
+  .kbd {
+    @apply inline-flex h-5 min-w-[20px] items-center justify-center rounded border border-white/15 bg-white/[0.06]
+           px-1.5 font-mono text-[10px] font-semibold text-slate-400;
+  }
+
+  /* Figures that update in place. Without tabular-nums a ticking price jitters
+     as glyph widths change, which reads as the layout being unstable. */
+  .num {
+    @apply font-mono;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Faint engineering grid. Masked to fade out so it never reaches an edge and
+   turns into a visible rectangle sitting on top of the page. */
+.grid-bg {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 56px 56px;
+  -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 40%, transparent 100%);
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 40%, transparent 100%);
+}
+
+/* Scroll-reveal. The visible state is the default and the hidden state is
+   opt-in, so if the observer never runs — a hidden tab, a browser without
+   IntersectionObserver — the content is still on screen. Animating content
+   in from invisible is only safe when invisible cannot be the final state. */
+.reveal {
+  opacity: 0;
+  transform: translateY(14px);
+  transition:
+    opacity 0.6s cubic-bezier(0.21, 1.02, 0.73, 1),
+    transform 0.6s cubic-bezier(0.21, 1.02, 0.73, 1);
+}
+.reveal-in {
+  opacity: 1;
+  transform: none;
+}
+
+/* Anything decorative and looping stops for users who ask it to. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  .reveal {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Price ticks: a brief tint so live movement is visible, not just numeric. */
+@keyframes tick-up {
+  0% {
+    background-color: rgba(52, 211, 153, 0.22);
+    color: #6ee7b7;
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+@keyframes tick-down {
+  0% {
+    background-color: rgba(251, 113, 133, 0.22);
+    color: #fda4af;
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+.tick-up {
+  animation: tick-up 0.7s ease-out;
+  border-radius: 4px;
+}
+.tick-down {
+  animation: tick-down 0.7s ease-out;
+  border-radius: 4px;
+}
+
+.live-dot {
+  @apply inline-block h-1.5 w-1.5 rounded-full bg-emerald-400;
+  animation: live-pulse 1.6s ease-in-out infinite;
+}
+@keyframes live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.8);
+  }
+}
+
+.skeleton {
+  @apply relative overflow-hidden rounded-lg bg-white/[0.06];
+}
+.skeleton::after {
+  @apply absolute inset-0 animate-shimmer bg-gradient-to-r from-transparent via-white/10 to-transparent;
+  content: '';
+  transform: translateX(-100%);
+}
+
+.recharts-cartesian-axis-tick text {
+  fill: #64748b;
+  font-size: 11px;
+}
+.recharts-default-tooltip {
+  border-radius: 12px !important;
+}
