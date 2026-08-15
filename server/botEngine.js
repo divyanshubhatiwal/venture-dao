@@ -363,12 +363,18 @@ export function createBotEngine({ adapter, marketData, config: rawConfig, accoun
       if (emergencyStop) return BOT_STATES.KILL_SWITCH
       running = true
       setState(BOT_STATES.ANALYZING, 'started')
-      timer = setInterval(() => {
+
+      const tick = () =>
         runCycle().catch((err) => {
           setState(BOT_STATES.ERROR, err.message)
           record({ kind: 'error', message: err.message })
         })
-      }, intervalMs)
+
+      // Run at once rather than waiting out the first interval. Pressing Start
+      // and watching nothing happen for a full minute reads as a broken bot,
+      // and it delays the first scan for no benefit.
+      tick()
+      timer = setInterval(tick, intervalMs)
       timer.unref?.()
       return state
     },

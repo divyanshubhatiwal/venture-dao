@@ -122,6 +122,21 @@ const IDENTIFIER = /^[a-z0-9]+(?:[_.\-/][a-z0-9]+)+$/
  * lowercase words joined by separators; credentials are high-entropy and mix
  * character classes, so that distinction is what is tested here.
  */
+/**
+ * Strip credentials embedded inside a longer string.
+ *
+ * The whole-value check below cannot see these: an exchange error reads like
+ * `auth failed for apiKey=AbCd... signature=ZZZZ...`, which is not itself
+ * token-shaped, so it passed through untouched and the key landed in the log.
+ * Error text from a venue is one of the likeliest places for a credential to
+ * escape, precisely because nobody thinks of it as a credential.
+ */
+const EMBEDDED = /((?:api[_-]?key|api[_-]?secret|secret|signature|authorization|token|password)\s*[:=]\s*)(\S+)/gi
+
+function scrubText(value) {
+  return value.replace(EMBEDDED, (_m, label) => `${label}[redacted]`)
+}
+
 function looksSecret(value) {
   if (value.length < 20) return false
   if (IDENTIFIER.test(value)) return false
@@ -140,7 +155,7 @@ function looksSecret(value) {
  */
 export function redact(value, depth = 0) {
   if (depth > 6 || value == null) return value
-  if (typeof value === 'string') return looksSecret(value) ? '[redacted]' : value
+  if (typeof value === 'string') return looksSecret(value) ? '[redacted]' : scrubText(value)
   if (Array.isArray(value)) return value.map((v) => redact(v, depth + 1))
   if (typeof value !== 'object') return value
 

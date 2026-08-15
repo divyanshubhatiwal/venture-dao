@@ -119,3 +119,28 @@ describe('redact', () => {
     expect(() => redact({ a: [{ b: [{ c: { d: { e: { f: { g: 1 } } } } }] }] })).not.toThrow()
   })
 })
+
+describe('redact — credentials embedded in free text', () => {
+  it('strips key=value pairs inside an error message', () => {
+    const msg = 'auth failed for apiKey=AbCd1234EfGh5678IjKl signature=ZZZZ1111YYYY2222XXXX'
+    const out = redact({ message: msg })
+    expect(out.message).not.toContain('AbCd1234EfGh5678IjKl')
+    expect(out.message).not.toContain('ZZZZ1111YYYY2222XXXX')
+    expect(out.message).toContain('[redacted]')
+  })
+
+  it('keeps the surrounding message readable', () => {
+    const out = redact({ message: 'auth failed for apiKey=SECRETVALUE1234567890' })
+    expect(out.message).toMatch(/^auth failed for apiKey=/)
+  })
+
+  it('handles colon-separated and cased variants', () => {
+    for (const m of ['API_SECRET: abcdef1234567890abcdef', 'Authorization: Bearer aaaaaaaaaaaaaaaaaaaa']) {
+      expect(redact({ m }).m).toContain('[redacted]')
+    }
+  })
+
+  it('leaves ordinary prose untouched', () => {
+    expect(redact({ m: 'order rejected: insufficient margin' }).m).toBe('order rejected: insufficient margin')
+  })
+})

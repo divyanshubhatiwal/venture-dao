@@ -1,6 +1,7 @@
 import { createBotEngine, BOT_STATES } from './botEngine.js'
 import { resolveConfig } from './delta.js'
 import { dailyProgress, dailyReport, inWindow, isAroundTheClock, minutesToClose } from './dailySession.js'
+import { createCcxtVenue } from './venues/ccxtVenue.js'
 
 /**
  * Owns the running bot and the ledger it trades against.
@@ -176,11 +177,39 @@ function createPaperAdapter(config) {
   }
 }
 
+/**
+ * Build the venue the bot will trade through.
+ *
+ * Paper is the default and stays the default. Selecting a real venue is an
+ * explicit act, and live remains gated by the same two environment switches as
+ * everywhere else — a venue choice made over HTTP must never be able to
+ * promote testnet to live.
+ */
+function createVenue(mode, config) {
+  if (mode !== 'ccxt') return createPaperAdapter(config)
+
+  const delta = resolveConfig()
+  if (!delta.hasCredentials) throw new Error('No Delta credentials configured; cannot use the ccxt venue.')
+
+  return createCcxtVenue({
+    region: delta.region,
+    // Not `delta.live` alone: live requires both switches, and resolveConfig
+    // has already collapsed that decision. Reusing its answer keeps one source
+    // of truth for whether real money is reachable.
+    live: delta.environment.live === true,
+    apiKey: delta.apiKey,
+    secret: delta.apiSecret,
+    killSwitch: () => resolveConfig().killSwitch,
+    maxOrderNotional: delta.maxOrderNotional,
+  })
+}
+
 const engines = new Map()
 
-export function getBot(accountId = 'default', overrides = null) {
+export function getBot(accountId = 'default', overrides = null, venueMode = null) {
   let entry = engines.get(accountId)
-  if (!entry || overrides) {
+  const switchingVenue = venueMode != null && venueMode !== entry?.mode
+  if (!entry || overrides || switchingVenue) {
     // A config change rebuilds the engine, which is also how a running bot is
     // prevented from having its risk limits altered underneath it mid-cycle.
     entry?.engine.pause()
@@ -189,12 +218,15 @@ export function getBot(accountId = 'default', overrides = null) {
     // open positions and their realised P&L — on a real venue the positions
     // would still exist while the bot forgot about them, which is the worst
     // possible outcome of editing a risk limit.
-    const adapter = entry?.adapter ?? createPaperAdapter(config)
+    const mode = venueMode ?? entry?.mode ?? 'paper'
+    // A venue change builds a fresh adapter; a mere config change keeps the
+    // existing ledger so open positions are not forgotten.
+    const adapter = switchingVenue || !entry?.adapter ? createVenue(mode, config) : entry.adapter
     const logger = (event) => {
       entry2.events.unshift(event)
       entry2.events.length = Math.min(entry2.events.length, 100)
     }
-    const entry2 = { config, adapter, events: [], mode: 'paper' }
+    const entry2 = { config, adapter, events: [], mode }
     entry2.engine = createBotEngine({
       adapter,
       marketData,

@@ -1,12 +1,25 @@
 import { useEffect, useState } from 'react'
 import { Activity, Ban, CircleDot, Pause, Radio } from 'lucide-react'
 import { deltaVenue } from '../lib/venues'
-import { getBotStatus, subscribeBotStatus } from '../lib/botStatus'
+import { botApi } from '../lib/botApi'
 
 const BOT_CHIP = {
   running: { label: 'BOT RUNNING', tone: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300', icon: Activity },
   paused: { label: 'BOT PAUSED', tone: 'border-amber-500/30 bg-amber-500/10 text-amber-300', icon: Pause },
   off: { label: 'BOT OFF', tone: 'border-white/10 bg-white/[0.04] text-slate-500', icon: CircleDot },
+}
+
+/**
+ * Derive the chip from what the server reports about the loop that actually
+ * trades. This previously read a value published by the Goal Agent page, so
+ * the bar could read BOT OFF while the server-side bot was mid-cycle — two
+ * different "bots" on one screen, disagreeing. There is one bot, it lives on
+ * the server, so ask it.
+ */
+function modeFrom(status) {
+  if (!status) return 'off'
+  if (status.emergencyStop || status.killSwitch) return 'paused'
+  return status.running ? 'running' : 'off'
 }
 
 /**
@@ -21,9 +34,22 @@ const BOT_CHIP = {
  */
 export default function TradingStatusBar({ streaming, source }) {
   const [delta, setDelta] = useState(null)
-  const [bot, setBot] = useState(getBotStatus)
+  const [bot, setBot] = useState(null)
 
-  useEffect(() => subscribeBotStatus(setBot), [])
+  useEffect(() => {
+    let alive = true
+    const poll = () =>
+      botApi
+        .status()
+        .then((s) => alive && setBot(s))
+        .catch(() => alive && setBot(null))
+    poll()
+    const t = setInterval(poll, 5000)
+    return () => {
+      alive = false
+      clearInterval(t)
+    }
+  }, [])
 
   useEffect(() => {
     let alive = true
@@ -40,7 +66,7 @@ export default function TradingStatusBar({ streaming, source }) {
     }
   }, [])
 
-  const botChip = BOT_CHIP[bot.mode] ?? BOT_CHIP.off
+  const botChip = BOT_CHIP[modeFrom(bot)]
   const BotIcon = botChip.icon
 
   return (
@@ -63,7 +89,7 @@ export default function TradingStatusBar({ streaming, source }) {
         </span>
       )}
 
-      <span className={`chip ${botChip.tone}`} title={bot.reason ?? undefined}>
+      <span className={`chip ${botChip.tone}`} title={bot?.state ? `${bot.state} · ${bot.mode}` : undefined}>
         <BotIcon size={11} />
         {botChip.label}
       </span>

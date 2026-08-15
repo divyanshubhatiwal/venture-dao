@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AlertTriangle, Loader2, OctagonX, Pause, Play, RotateCw, StepForward } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, HelpCircle, Loader2, OctagonX, Pause, Play, RotateCw } from 'lucide-react'
 import { botApi } from '../lib/botApi'
+import { summariseBlockers } from '../lib/botReasons'
 
 const STATE_TONE = {
   STOPPED: 'border-white/10 bg-white/[0.04] text-slate-400',
@@ -28,15 +29,22 @@ const money = (n) => {
 const fmtMins = (m) => (m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`)
 
 const FIELDS = [
-  ['startingBalance', 'Capital'],
-  ['targetBalance', 'Target balance'],
-  ['riskPerTradePercent', 'Risk / trade %'],
-  ['maxLeverage', 'Max leverage'],
-  ['maxPositionPercent', 'Max position %'],
-  ['maxOpenPositions', 'Max positions'],
-  ['dailyTargetPercent', 'Daily target %'],
-  ['dailyLossLimitPercent', 'Daily loss %'],
+  ['startingBalance', 'Capital', 'Money the bot sizes positions against.'],
+  ['targetBalance', 'Target balance', 'Balance that ends the whole campaign.'],
+  ['riskPerTradePercent', 'Risk / trade %', 'Most you can lose on one trade if the stop is hit. Not the position size.'],
+  ['maxLeverage', 'Max leverage', 'Largest position as a multiple of equity.'],
+  ['maxPositionPercent', 'Max position %', 'Largest single position as a share of equity. Lower this to be safer; raise it if trades keep being blocked.'],
+  ['maxOpenPositions', 'Max positions', 'How many markets it may hold at once.'],
+  ['dailyTargetPercent', 'Daily target %', 'Profit that stops trading for the day. An objective, never a promise.'],
+  ['dailyLossLimitPercent', 'Daily loss %', 'Loss that stops trading for the day.'],
 ]
+
+const TONE = {
+  slate: 'border-white/10 bg-white/[0.03] text-slate-300',
+  amber: 'border-amber-500/25 bg-amber-500/[0.07] text-amber-200',
+  rose: 'border-rose-500/25 bg-rose-500/[0.07] text-rose-200',
+  emerald: 'border-emerald-500/25 bg-emerald-500/[0.07] text-emerald-200',
+}
 
 /**
  * Controls for the server-side autonomous bot.
@@ -104,6 +112,7 @@ export default function BotControlPanel() {
 
   const locked = status.emergencyStop
   const cfg = draft ?? status.config
+  const blocker = summariseBlockers(status.journal)
 
   return (
     <div className="card overflow-hidden">
@@ -130,6 +139,22 @@ export default function BotControlPanel() {
 
       {error && <p className="mx-4 mb-2 text-[11px] text-rose-300">{error}</p>}
 
+      {/* The question this app kept failing to answer. The engine always knew
+          why it declined; it just said so in codes, in a log, below the fold. */}
+      {blocker && (
+        <div className={`mx-4 mb-3 rounded-xl border p-3 ${TONE[blocker.tone] ?? TONE.slate}`}>
+          <div className="flex items-center gap-2">
+            {blocker.healthy ? <CheckCircle2 size={14} className="shrink-0" /> : <AlertTriangle size={14} className="shrink-0" />}
+            <p className="text-[11px] font-semibold">{status.running ? blocker.title : 'Bot is stopped'}</p>
+            {blocker.count > 1 && <span className="num ml-auto text-[10px] opacity-70">{blocker.count}×</span>}
+          </div>
+          <p className="mt-1.5 text-[11px] leading-relaxed opacity-90">
+            {status.running ? blocker.why : 'Press Start and it will scan the markets on its own, every minute.'}
+          </p>
+          {status.running && blocker.fix && <p className="mt-1.5 text-[10px] leading-relaxed opacity-70">{blocker.fix}</p>}
+        </div>
+      )}
+
       {/* Controls */}
       <div className="grid grid-cols-2 gap-1.5 px-4 pb-3">
         <button
@@ -143,10 +168,6 @@ export default function BotControlPanel() {
         <button onClick={() => run('pause', botApi.pause)} disabled={busy || !status.running} className="btn-ghost btn-sm justify-center py-2 disabled:opacity-40">
           {busy === 'pause' ? <Loader2 size={13} className="animate-spin" /> : <Pause size={13} />}
           Pause
-        </button>
-        <button onClick={() => run('step', botApi.step)} disabled={busy || locked} className="btn-ghost btn-sm justify-center py-2 disabled:opacity-40">
-          {busy === 'step' ? <Loader2 size={13} className="animate-spin" /> : <StepForward size={13} />}
-          Run one cycle
         </button>
         {locked ? (
           <button onClick={() => run('resume', botApi.resume)} disabled={busy} className="btn-ghost btn-sm justify-center py-2 text-amber-300 disabled:opacity-40">
@@ -264,9 +285,12 @@ export default function BotControlPanel() {
 
       {/* Config */}
       <div className="grid grid-cols-2 gap-2 px-4 py-3">
-        {FIELDS.map(([key, label]) => (
-          <label key={key} className="block">
-            <span className="label text-[10px]">{label}</span>
+        {FIELDS.map(([key, label, help]) => (
+          <label key={key} className="block" title={help}>
+            <span className="label flex items-center gap-1 text-[10px]">
+              {label}
+              <HelpCircle size={9} className="text-slate-600" />
+            </span>
             <input
               type="number"
               value={cfg[key] ?? ''}

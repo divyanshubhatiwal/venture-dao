@@ -232,6 +232,52 @@ app.put(
   }),
 )
 
+/**
+ * Switch the venue the bot trades through.
+ *
+ * The venue is probed before it is adopted: a bot pointed at an exchange it
+ * cannot authenticate against would sit in ANALYZING forever, failing every
+ * cycle for a reason nobody sees. Better to refuse the switch and say why.
+ */
+app.put(
+  '/api/bot/venue',
+  asHandler(async (req) => {
+    const mode = String(req.body?.venue ?? '').toLowerCase()
+    if (!['paper', 'ccxt'].includes(mode)) {
+      const err = new Error('venue must be "paper" or "ccxt".')
+      err.status = 400
+      throw err
+    }
+
+    const running = getBot().engine.isRunning()
+    if (running) {
+      // Changing venue under a running bot would strand any open position on
+      // the old one, unmanaged and unwatched.
+      const err = new Error('Pause the bot before changing venue.')
+      err.status = 409
+      throw err
+    }
+
+    if (mode === 'ccxt') {
+      const probe = getBot('default', null, 'ccxt')
+      try {
+        await probe.adapter.getAccount()
+      } catch (probeErr) {
+        // Fall back to paper so a failed switch cannot leave the bot pointed
+        // at an unusable venue.
+        getBot('default', null, 'paper')
+        const err = new Error(`Venue unreachable, staying on paper: ${probeErr.message}`)
+        err.status = 502
+        throw err
+      }
+      return botStatus()
+    }
+
+    getBot('default', null, 'paper')
+    return botStatus()
+  }),
+)
+
 app.listen(PORT, () => {
   const config = resolveConfig()
   console.log(`\n  VentureDAO backend  →  http://localhost:${PORT}`)
