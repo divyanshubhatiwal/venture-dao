@@ -1,4 +1,4 @@
-import { SNAPSHOT_CANDLES, SNAPSHOT_INDEX_QUOTES, SNAPSHOT_STOCK_QUOTES, STOCK_SNAPSHOT_CAPTURED_AT } from './stockSnapshot'
+import { SNAPSHOT_CANDLES, SNAPSHOT_INDEX_QUOTES, SNAPSHOT_STOCK_QUOTES, STOCK_SNAPSHOT_CAPTURED_AT } from './stockSnapshot.js'
 
 /**
  * World equity and index data from Yahoo Finance.
@@ -12,7 +12,7 @@ import { SNAPSHOT_CANDLES, SNAPSHOT_INDEX_QUOTES, SNAPSHOT_STOCK_QUOTES, STOCK_S
  * is on screen.
  */
 
-const BASE = import.meta.env.VITE_STOCK_PROXY || '/yf'
+const BASE = import.meta.env?.VITE_STOCK_PROXY || '/yf'
 
 export const INDICES = [
   { symbol: '^GSPC', name: 'S&P 500', region: 'United States', currency: 'USD' },
@@ -35,6 +35,13 @@ export const STOCKS = [
   { symbol: 'META', name: 'Meta Platforms', region: 'United States', currency: 'USD' },
   { symbol: 'TSLA', name: 'Tesla', region: 'United States', currency: 'USD' },
   { symbol: 'COIN', name: 'Coinbase', region: 'United States', currency: 'USD' },
+  // NSE listings. Yahoo quotes these natively in INR, so they need no
+  // conversion — the ".NS" suffix is what selects the National Stock Exchange.
+  { symbol: 'RELIANCE.NS', name: 'Reliance Industries', region: 'India', currency: 'INR' },
+  { symbol: 'TCS.NS', name: 'Tata Consultancy', region: 'India', currency: 'INR' },
+  { symbol: 'INFY.NS', name: 'Infosys', region: 'India', currency: 'INR' },
+  { symbol: 'HDFCBANK.NS', name: 'HDFC Bank', region: 'India', currency: 'INR' },
+  { symbol: 'ICICIBANK.NS', name: 'ICICI Bank', region: 'India', currency: 'INR' },
 ]
 
 /**
@@ -90,10 +97,12 @@ const enc = (s) => encodeURIComponent(s)
  * Yahoo returns parallel arrays with nulls on non-trading slots — those rows
  * are dropped rather than interpolated, so gaps stay honest.
  */
-export async function getStockCandles(symbol = '^GSPC', rangeKey = '1D') {
+export async function getStockCandles(symbol = '^GSPC', rangeKey = '1D', { fresh = false } = {}) {
   const range = STOCK_RANGES.find((r) => r.key === rangeKey) ?? STOCK_RANGES[4]
   const key = `sc:${symbol}:${rangeKey}`
-  const hit = cached(key)
+  // `fresh` is how the chart's background refresh gets past a TTL that is
+  // longer than its own period. See the same flag in marketApi.getCandles.
+  const hit = fresh ? null : cached(key)
   if (hit) return hit
 
   try {

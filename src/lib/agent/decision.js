@@ -1,8 +1,8 @@
-import { computeGoalState, computeStreaks } from './goalManager'
-import { deriveState } from './stateMachine'
-import { critique } from './critic'
-import { assessRisk } from './riskEngine'
-import { generateSignal } from '../signals'
+import { computeGoalState, computeStreaks } from './goalManager.js'
+import { deriveState } from './stateMachine.js'
+import { critique } from './critic.js'
+import { assessRisk } from './riskEngine.js'
+import { generateSignal } from '../signals.js'
 
 /**
  * The decision pipeline, in the order the spec lays out:

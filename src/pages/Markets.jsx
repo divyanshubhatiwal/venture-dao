@@ -1,14 +1,28 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Activity, AlertTriangle, ArrowDownRight, ArrowUpRight, Coins, Globe, Minus, RefreshCw, Sparkles, TrendingDown, TrendingUp, Wifi, WifiOff } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Activity, AlertTriangle, ArrowDownRight, ArrowUpRight, Coins, Globe, RefreshCw, Wifi, WifiOff } from 'lucide-react'
 import { Card, PageHeader, SectionTitle, Skeleton } from '../components/ui'
 import CandleChart from '../components/CandleChart'
-import LiveValue, { LiveBadge } from '../components/LiveValue'
+import ChartToolbar from '../components/ChartToolbar'
+import BotSignalPanel from '../components/BotSignalPanel'
+import TradingTabs from '../components/TradingTabs'
+import TradingStatusBar from '../components/TradingStatusBar'
+import BotControlPanel from '../components/BotControlPanel'
+import LiveValue from '../components/LiveValue'
 import { useMarket } from '../context/MarketContext'
 import { RANGES, WATCHLIST, getCandles } from '../lib/marketApi'
 import { INDICES, STOCKS, STOCK_RANGES, formatPrice, getIndexQuotes, getStockCandles, getStockQuotes } from '../lib/stockApi'
+import { INTERVAL_MS, mergeLiveCandle } from '../lib/liveCandles'
+import { detectCurrency, formatIn, getRate } from '../lib/fx'
 import { explainSignal, generateSignal, MIN_CANDLES } from '../lib/signals'
 import { DAO_STATS } from '../lib/mockData'
 import { num, usd } from '../lib/format'
+
+/**
+ * How often the candle series is reconciled against the exchange. Short enough
+ * that a closed candle is corrected quickly, long enough to stay well inside
+ * Binance's rate limits for a chart nobody is interacting with.
+ */
+const CHART_REFRESH_MS = 30_000
 
 const TABS = [
   { key: 'crypto', label: 'Crypto', hint: 'The asset class the treasury holds' },
@@ -89,117 +103,6 @@ function IndexCard({ row, active, onSelect }) {
   )
 }
 
-const OUTLOOK = {
-  long: { word: 'Up', icon: TrendingUp, frame: 'border-emerald-500/30 bg-emerald-500/[0.06]', text: 'text-emerald-300', bar: 'bg-emerald-400' },
-  short: { word: 'Down', icon: TrendingDown, frame: 'border-rose-500/30 bg-rose-500/[0.06]', text: 'text-rose-300', bar: 'bg-rose-400' },
-  flat: { word: 'Sideways', icon: Minus, frame: 'border-white/10 bg-white/[0.03]', text: 'text-slate-300', bar: 'bg-slate-400' },
-}
-
-/**
- * The agent's read on the chart above: which way it leans, how hard, and why.
- *
- * The word is deliberately "lean", not "will". The engine is weighted technical
- * analysis over price history — it has no view on news, earnings or macro, and
- * confidence here measures how much its own checks agree with each other, not
- * the probability of being right. Presenting agreement as certainty is the one
- * dishonest thing this panel could do, so the checks that disagree are shown
- * next to the ones that don't.
- */
-function Outlook({ signal, candles, priceOf }) {
-  if (!signal.ok) {
-    return (
-      <div className="mt-4 flex items-center gap-2.5 rounded-xl border border-white/10 bg-white/[0.02] px-4 py-3">
-        <Sparkles size={14} className="shrink-0 text-slate-500" />
-        <p className="text-xs text-slate-500">
-          Not enough history for a read — {candles.length} candles loaded, {MIN_CANDLES} needed. Try a longer range.
-        </p>
-      </div>
-    )
-  }
-
-  const look = OUTLOOK[signal.direction]
-  const Icon = look.icon
-  const agreeing = signal.checks.filter((c) => c.verdict === (signal.direction === 'short' ? 'bearish' : 'bullish'))
-  const opposing = signal.checks.filter((c) => c.verdict === (signal.direction === 'short' ? 'bullish' : 'bearish'))
-
-  return (
-    <div className={`mt-4 rounded-xl border ${look.frame} p-4`}>
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
-        {/* The verdict */}
-        <div className="flex shrink-0 items-center gap-3">
-          <span className={`grid h-11 w-11 place-items-center rounded-xl border border-white/10 bg-white/[0.05] ${look.text}`}>
-            <Icon size={20} />
-          </span>
-          <div>
-            <p className="label flex items-center gap-1.5">
-              <Sparkles size={10} /> Agent outlook
-            </p>
-            <p className={`text-xl font-bold leading-tight ${look.text}`}>
-              {look.word}
-              <span className="ml-2 text-xs font-medium text-slate-500">{signal.bias}</span>
-            </p>
-          </div>
-        </div>
-
-        {/* Conviction */}
-        <div className="shrink-0 lg:w-40">
-          <div className="flex items-baseline justify-between">
-            <p className="label">Agreement</p>
-            <p className="font-mono text-sm font-bold text-slate-100">{signal.confidence}%</p>
-          </div>
-          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/[0.07]">
-            <div className={`h-full rounded-full ${look.bar}`} style={{ width: `${signal.confidence}%` }} />
-          </div>
-          <p className="mt-1.5 text-[10px] leading-snug text-slate-600">
-            {agreeing.length} of {signal.checks.length} checks agree · {opposing.length} against
-          </p>
-        </div>
-
-        {/* Reasoning */}
-        <p className="min-w-0 flex-1 text-xs leading-relaxed text-slate-400">{explainSignal(signal)}</p>
-      </div>
-
-      {/* Every check, with the number it fired on. */}
-      <div className="mt-4 flex flex-wrap gap-1.5 border-t border-white/[0.07] pt-3.5">
-        {signal.checks.map((c) => (
-          <span
-            key={c.name}
-            title={`weight ${c.weight}`}
-            className={`chip ${
-              c.verdict === 'bullish'
-                ? 'border-emerald-500/25 bg-emerald-500/[0.08] text-emerald-300'
-                : c.verdict === 'bearish'
-                  ? 'border-rose-500/25 bg-rose-500/[0.08] text-rose-300'
-                  : 'border-white/10 bg-white/[0.03] text-slate-500'
-            }`}
-          >
-            {c.name} <span className="font-mono opacity-70">{c.detail}</span>
-          </span>
-        ))}
-      </div>
-
-      {/* Where it expects to be proved right, and where wrong. */}
-      {signal.direction !== 'flat' && (
-        <div className="mt-3.5 grid grid-cols-2 gap-4 border-t border-white/[0.07] pt-3.5 sm:grid-cols-4">
-          {[
-            ['If right — target', priceOf(signal.levels.target), 'text-emerald-300'],
-            ['If wrong — stop', priceOf(signal.levels.stop), 'text-rose-300'],
-            ['Reward : risk', signal.levels.riskReward ? `${signal.levels.riskReward} : 1` : '—', 'text-slate-100'],
-            ['Volatility (ATR 14)', priceOf(signal.levels.atr), 'text-slate-100'],
-          ].map(([label, value, tone]) => (
-            <div key={label}>
-              <p className="label">{label}</p>
-              <p className={`mt-1 font-mono text-sm font-semibold ${tone}`}>{value}</p>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <p className="mt-3 text-[10px] leading-relaxed text-slate-600">{signal.disclaimer}</p>
-    </div>
-  )
-}
-
 export default function Markets() {
   const market = useMarket()
   const [tab, setTab] = useState('crypto')
@@ -215,7 +118,48 @@ export default function Markets() {
   const [equityLoading, setEquityLoading] = useState(true)
   const [chart, setChart] = useState(null)
   const [chartLoading, setChartLoading] = useState(true)
-  const [showSma, setShowSma] = useState(true)
+
+  const chartRef = useRef(null)
+  const terminalRef = useRef(null)
+  const [indicators, setIndicators] = useState({ ema20: true, sma50: true, bb: false, volume: true, rsi: false, macd: false, atr: false })
+  const [viewport, setViewport] = useState({ size: 120, anchor: 0, paused: false })
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  // Drives whether the signal panel is collapsible: on a desktop it sits beside
+  // the chart and is always open; below that it stacks and can be folded away.
+  const [isDesktop, setIsDesktop] = useState(() => (typeof window === 'undefined' ? true : window.innerWidth >= 1280))
+
+  useEffect(() => {
+    const onResize = () => setIsDesktop(window.innerWidth >= 1280)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
+  // Fullscreen is tracked from the browser's own event rather than assumed on
+  // click, so pressing Escape leaves the button in the right state.
+  useEffect(() => {
+    const onChange = () => setIsFullscreen(Boolean(document.fullscreenElement))
+    document.addEventListener('fullscreenchange', onChange)
+    return () => document.removeEventListener('fullscreenchange', onChange)
+  }, [])
+
+  // Display currency. Defaults to the viewer's region, but the rate must
+  // actually load before anything is converted — see src/lib/fx.js for why
+  // there is no fallback constant.
+  const [display, setDisplay] = useState(detectCurrency)
+  const [rate, setRate] = useState(null)
+
+  useEffect(() => {
+    let alive = true
+    getRate(display).then((r) => alive && setRate(r))
+    return () => {
+      alive = false
+    }
+  }, [display])
+
+  const toggleFullscreen = useCallback(() => {
+    if (document.fullscreenElement) document.exitFullscreen?.()
+    else terminalRef.current?.requestFullscreen?.().catch(() => {})
+  }, [])
 
   const isCrypto = tab === 'crypto'
   const { symbol, range: rangeKey } = selection[tab]
@@ -237,12 +181,24 @@ export default function Markets() {
   useEffect(() => {
     let alive = true
     setChartLoading(true)
-    const load = isCrypto ? getCandles(symbol, rangeKey) : getStockCandles(symbol, rangeKey)
-    load
-      .then((res) => alive && setChart(res))
-      .finally(() => alive && setChartLoading(false))
+
+    const load = (fresh) =>
+      (isCrypto ? getCandles(symbol, rangeKey, { fresh }) : getStockCandles(symbol, rangeKey, { fresh }))
+        .then((res) => alive && setChart(res))
+        .catch(() => {
+          /* keep the last good series rather than blanking the chart */
+        })
+
+    load(false).finally(() => alive && setChartLoading(false))
+
+    // The websocket keeps the newest candle moving, but only the exchange knows
+    // the true open/high/low/volume once a candle closes. This reconciles the
+    // series against the source periodically so the live approximation never
+    // accumulates. No spinner: refreshing in place must not blank the chart.
+    const timer = setInterval(() => load(true), CHART_REFRESH_MS)
     return () => {
       alive = false
+      clearInterval(timer)
     }
   }, [isCrypto, symbol, rangeKey])
 
@@ -254,9 +210,35 @@ export default function Markets() {
     : { source: equity[tab]?.source, stale: equity[tab]?.stale, capturedAt: equity[tab]?.capturedAt }
 
   const active = rows.find((r) => r.symbol === symbol)
-  const candles = chart?.candles ?? []
+  const restCandles = chart?.candles ?? []
+
+  // Crypto ticks arrive about once a second over the websocket, so the newest
+  // candle is rebuilt from them rather than waiting on the next REST refresh.
+  // Equities have no such stream and their candles are only as fresh as the
+  // poll, so they are passed through untouched instead of being animated with
+  // a price the exchange has not actually printed into a bar.
+  const livePrice = isCrypto ? active?.price : null
+  const candles = useMemo(
+    () => (isCrypto ? mergeLiveCandle(restCandles, livePrice, INTERVAL_MS[rangeKey]) : restCandles),
+    [restCandles, livePrice, isCrypto, rangeKey],
+  )
+  // What the exchange quotes this instrument in. NSE listings already come
+  // back in INR, so they are shown as-is rather than round-tripped.
   const currency = isCrypto ? 'USD' : (chart?.currency ?? active?.currency ?? 'USD')
-  const priceOf = (v) => (isCrypto ? cryptoPrice(v) : formatPrice(v, currency))
+
+  // Conversion applies only to USD-quoted instruments, and only once a real
+  // rate has loaded. Anything quoted in a third currency (GBP, JPY, HKD) is
+  // left alone: converting it would need a second rate this does not fetch.
+  const converting = currency === 'USD' && display !== 'USD' && rate != null
+  const priceOf = useCallback(
+    (v) => {
+      if (v == null) return '—'
+      if (converting) return formatIn(v * rate, display)
+      if (currency === 'USD') return isCrypto ? cryptoPrice(v) : formatPrice(v, 'USD')
+      return formatPrice(v, currency)
+    },
+    [converting, rate, display, currency, isCrypto],
+  )
 
   // The agent's read on whatever is currently charted. Recomputed as candles
   // stream in, so the outlook tracks the chart rather than the page load.
@@ -328,148 +310,134 @@ export default function Markets() {
         </div>
       )}
 
-      {/* Price header + chart */}
-      <Card className="p-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-baseline gap-3">
-              <h2 className="text-lg font-bold text-white">
-                {active?.name ?? symbol}
-                <span className="ml-2 font-mono text-sm text-slate-500">{isCrypto ? `${symbol} / USD` : symbol}</span>
-              </h2>
-              {active && <Change value={isCrypto ? active.change24h : active.change} className="text-sm" />}
-              <span className="text-[11px] text-slate-600">{isCrypto ? '24h' : 'session'}</span>
-            </div>
-            {loading && !active ? (
-              <Skeleton className="mt-2 h-8 w-40" />
-            ) : (
-              <LiveValue
-                value={active?.price ?? stats?.last}
-                format={priceOf}
-                className="mt-1 block font-mono text-3xl font-bold tracking-tight text-white"
-              />
-            )}
-            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-600">
-              {isCrypto ? (
-                <>
-                  <LiveBadge live={market.streaming} label={market.streaming ? 'streaming' : 'polling'} />
-                  <span>
-                    {market.streaming ? 'Binance websocket · ticks as they print' : 'Websocket reconnecting — polling every 60s'}
-                  </span>
-                </>
+      {/* Terminal: chart is the primary element, signal panel beside it */}
+      <div ref={terminalRef} className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
+        <Card className="flex min-w-0 flex-col p-4 sm:p-5">
+          {/* Instrument header */}
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-baseline gap-2.5">
+                <h2 className="text-base font-bold text-white sm:text-lg">
+                  {active?.name ?? symbol}
+                  <span className="ml-2 num text-sm text-slate-500">{isCrypto ? `${symbol} / USD` : symbol}</span>
+                </h2>
+                {active && <Change value={isCrypto ? active.change24h : active.change} className="text-sm" />}
+                <span className="text-[11px] text-slate-600">{isCrypto ? '24h' : 'session'}</span>
+              </div>
+              {loading && !active ? (
+                <Skeleton className="mt-2 h-8 w-40" />
               ) : (
-                <>
-                  <LiveBadge live={Boolean(active?.marketOpen)} label={active?.marketOpen ? 'market open' : 'market closed'} />
-                  <span>
-                    {[chart?.exchange, chart?.marketTime ? `last trade ${new Date(chart.marketTime).toLocaleString()}` : null]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </span>
-                </>
+                <LiveValue
+                  value={active?.price ?? stats?.last}
+                  format={priceOf}
+                  className="mt-1 block num text-2xl font-bold tracking-tight text-white sm:text-3xl"
+                />
+              )}
+            </div>
+            <div className="flex flex-col items-end gap-2">
+              <TradingStatusBar streaming={isCrypto && market.streaming} source={chart?.source} />
+              <div className="flex items-center gap-0.5 rounded-lg border border-white/[0.07] bg-white/[0.02] p-0.5">
+                {['USD', 'INR'].map((c) => (
+                  <button
+                    key={c}
+                    onClick={() => setDisplay(c)}
+                    className={`rounded-md px-2 py-1 text-[11px] font-semibold transition ${
+                      display === c ? 'bg-white/10 text-white' : 'text-slate-500 hover:text-slate-300'
+                    }`}
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+              {display !== 'USD' && currency === 'USD' && (
+                <p className="text-[10px] text-slate-600">
+                  {rate ? `converted @ ₹${rate.toFixed(2)}/$` : 'rate unavailable — showing USD'}
+                </p>
               )}
             </div>
           </div>
 
-          <div className="flex flex-col gap-3 lg:items-end">
-            <div className="flex flex-wrap gap-1.5 lg:justify-end">
-              {(isCrypto ? WATCHLIST : tab === 'stocks' ? STOCKS : INDICES).map((c) => (
-                <button
-                  key={c.symbol}
-                  onClick={() => select({ symbol: c.symbol })}
-                  className={`rounded-lg px-2.5 py-1.5 font-mono text-xs font-semibold transition ${
-                    symbol === c.symbol ? 'bg-white/10 text-white' : 'text-slate-500 hover:bg-white/[0.05] hover:text-slate-300'
-                  }`}
-                >
-                  {c.symbol}
-                </button>
-              ))}
-            </div>
-            <div className="flex flex-wrap items-center gap-1.5 lg:justify-end">
-              {ranges.map((r) => (
-                <button
-                  key={r.key}
-                  onClick={() => select({ range: r.key })}
-                  className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold transition ${
-                    rangeKey === r.key ? 'bg-brand-500/20 text-brand-200' : 'text-slate-500 hover:bg-white/[0.05] hover:text-slate-300'
-                  }`}
-                >
-                  {r.label}
-                </button>
-              ))}
+          {/* Instruments */}
+          <div className="mt-3 flex flex-wrap gap-1">
+            {(isCrypto ? WATCHLIST : tab === 'stocks' ? STOCKS : INDICES).map((c) => (
               <button
-                onClick={() => setShowSma((s) => !s)}
-                className={`ml-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition ${
-                  showSma ? 'bg-white/10 text-white' : 'text-slate-500 hover:bg-white/[0.05] hover:text-slate-300'
+                key={c.symbol}
+                onClick={() => select({ symbol: c.symbol })}
+                className={`rounded-lg px-2 py-1 num text-xs font-semibold transition ${
+                  symbol === c.symbol ? 'bg-white/10 text-white' : 'text-slate-500 hover:bg-white/[0.05] hover:text-slate-300'
                 }`}
               >
-                SMA
+                {c.symbol}
               </button>
-            </div>
-          </div>
-        </div>
-
-        {stats && (
-          <div className="mt-5 grid grid-cols-2 gap-4 border-t border-white/[0.06] pt-4 sm:grid-cols-4">
-            {[
-              ['Window change', null, <Change key="c" value={stats.change} />],
-              ['Window high', priceOf(stats.high)],
-              ['Window low', priceOf(stats.low)],
-              ['Volume', stats.volume > 0 ? `${num(stats.volume, 0)}M` : '—'],
-            ].map(([label, text, node]) => (
-              <div key={label}>
-                <p className="label">{label}</p>
-                <p className="mt-1 font-mono text-sm font-semibold text-slate-100">{node ?? text}</p>
-              </div>
             ))}
           </div>
-        )}
 
-        <div className="mt-4" data-demo="candles">
-          {chartLoading ? (
-            <Skeleton className="h-[320px] w-full" />
-          ) : (
-            <CandleChart
-              candles={candles}
-              intraday={intraday}
-              showSma={showSma}
-              currency={currency}
-              levels={signal.ok && signal.direction !== 'flat' ? signal.levels : null}
+          <div className="mt-3 border-t border-white/[0.06] pt-3">
+            <ChartToolbar
+              ranges={ranges}
+              rangeKey={rangeKey}
+              onRange={(key) => select({ range: key })}
+              indicators={indicators}
+              onToggleIndicator={(key) => setIndicators((s) => ({ ...s, [key]: !s[key] }))}
+              onReset={() => chartRef.current?.reset()}
+              onToggleFullscreen={toggleFullscreen}
+              isFullscreen={isFullscreen}
+              paused={viewport.paused}
+              onTogglePause={() => chartRef.current?.setPaused(!viewport.paused)}
             />
-          )}
-        </div>
+          </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[11px] text-slate-500">
-          <span className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-sm bg-emerald-400" /> Close above open
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-sm bg-rose-400" /> Close below open
-          </span>
-          {showSma && (
-            <>
-              <span className="flex items-center gap-1.5">
-                <span className="h-[2px] w-4 bg-brand-400" /> SMA 7
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="h-[2px] w-4 bg-fuchsia-300" /> SMA 25
-              </span>
-            </>
-          )}
-          {signal.ok && signal.direction !== 'flat' && (
-            <>
-              <span className="flex items-center gap-1.5">
-                <span className="h-[2px] w-4 bg-emerald-400" /> Agent target
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="h-[2px] w-4 bg-rose-400" /> Agent stop
-              </span>
-            </>
-          )}
-          {chart?.source && <span className="ml-auto">Candles: {chart.source}</span>}
-        </div>
+          <div className="mt-3 min-w-0 flex-1" data-demo="candles">
+            {chartLoading ? (
+              <Skeleton className="h-[460px] w-full" />
+            ) : (
+              <CandleChart
+                ref={chartRef}
+                candles={candles}
+                intraday={intraday}
+                currency={currency}
+                format={priceOf}
+                height={isFullscreen ? Math.max(460, window.innerHeight - 300) : 460}
+                indicators={indicators}
+                livePrice={isCrypto ? (active?.price ?? null) : null}
+                levels={signal.ok && signal.direction !== 'flat' ? signal.levels : null}
+                onViewportChange={setViewport}
+              />
+            )}
+          </div>
 
-        {chartLoading ? <Skeleton className="mt-4 h-28 w-full" /> : <Outlook signal={signal} candles={candles} priceOf={priceOf} />}
-      </Card>
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-white/[0.06] pt-2.5 text-[10px] text-slate-500">
+            {stats && (
+              <>
+                <span>H {priceOf(stats.high)}</span>
+                <span>L {priceOf(stats.low)}</span>
+                <span>Vol {stats.volume > 0 ? `${num(stats.volume, 0)}M` : '—'}</span>
+              </>
+            )}
+            <span className="text-slate-600">scroll to zoom · drag to pan</span>
+            {chart?.source && <span className="ml-auto">Candles: {chart.source}</span>}
+          </div>
+        </Card>
+
+        <div className="min-w-0 xl:sticky xl:top-20 xl:self-start">
+          {chartLoading ? (
+            <Skeleton className="h-[420px] w-full" />
+          ) : (
+            <BotSignalPanel signal={signal} priceOf={priceOf} collapsible={!isDesktop} />
+          )}
+          {/* The bot that would act on the signal above sits directly beneath
+              it, so the read and the thing executing on it stay together. */}
+          <div className="mt-4">
+            <BotControlPanel />
+          </div>
+        </div>
+      </div>
+
+      {/* Blotter, directly under the chart so it stays reachable */}
+      <div className="mt-4">
+        <TradingTabs />
+      </div>
+
 
       {/* World indices grid */}
       {tab === 'indices' && (

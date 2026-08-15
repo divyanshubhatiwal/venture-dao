@@ -1,4 +1,4 @@
-import { ETH_DAILY_CANDLES, SNAPSHOT_CAPTURED_AT, SNAPSHOT_TICKERS } from './marketSnapshot'
+import { ETH_DAILY_CANDLES, SNAPSHOT_CAPTURED_AT, SNAPSHOT_TICKERS } from './marketSnapshot.js'
 
 /**
  * Live market data for the treasury's asset class.
@@ -85,11 +85,14 @@ const toCandle = ([time, open, high, low, close, volume]) => ({
  * CoinGecko's OHLC endpoint carries no volume, so volume is omitted rather
  * than faked when that provider is used.
  */
-export async function getCandles(symbol = 'ETH', rangeKey = '1D') {
+export async function getCandles(symbol = 'ETH', rangeKey = '1D', { fresh = false } = {}) {
   const range = RANGES.find((r) => r.key === rangeKey) ?? RANGES[5]
   const asset = WATCHLIST.find((c) => c.symbol === symbol) ?? WATCHLIST[0]
   const key = `candles:${symbol}:${rangeKey}`
-  const hit = cached(key)
+  // The chart's background refresh passes `fresh`: it runs on a shorter period
+  // than the cache TTL, so without this it would keep being handed the very
+  // snapshot it is trying to replace.
+  const hit = fresh ? null : cached(key)
   if (hit) return hit
 
   try {

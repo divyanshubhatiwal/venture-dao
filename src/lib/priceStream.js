@@ -1,4 +1,4 @@
-import { WATCHLIST } from './marketApi'
+import { WATCHLIST } from './marketApi.js'
 
 /**
  * Real-time crypto prices over Binance's public WebSocket.
@@ -33,7 +33,7 @@ function emit(payload) {
     try {
       fn(payload)
     } catch (err) {
-      if (import.meta.env.DEV) console.warn('[priceStream] subscriber threw:', err)
+      if (import.meta.env?.DEV) console.warn('[priceStream] subscriber threw:', err)
     }
   })
 }

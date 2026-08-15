@@ -83,7 +83,7 @@ export const paperVenue = {
   },
 }
 
-const API = import.meta.env.VITE_API_URL || ''
+const API = import.meta.env?.VITE_API_URL || ''
 
 /**
  * Delta adapter. Sends the order to our own backend, which signs it with the

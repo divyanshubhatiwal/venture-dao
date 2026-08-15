@@ -12,11 +12,11 @@ import {
   SECTOR_ALLOCATION,
   SCORING_WEIGHTS,
   mockChatReply,
-} from './mockData'
+} from './mockData.js'
 
-const BASE_URL = import.meta.env.VITE_API_URL || ''
+const BASE_URL = import.meta.env?.VITE_API_URL || ''
 /** Set VITE_USE_MOCKS=false once the Express backend is running. */
-const FORCE_MOCKS = (import.meta.env.VITE_USE_MOCKS ?? 'true') !== 'false'
+const FORCE_MOCKS = (import.meta.env?.VITE_USE_MOCKS ?? 'true') !== 'false'
 
 export const http = axios.create({
   baseURL: BASE_URL,
@@ -45,7 +45,7 @@ async function withFallback(request, fallback, { minDelay = 0 } = {}) {
     const res = await request()
     return settle(res.data, 'live')
   } catch (err) {
-    if (import.meta.env.DEV) console.warn('[api] falling back to mock data:', err.message)
+    if (import.meta.env?.DEV) console.warn('[api] falling back to mock data:', err.message)
     return settle(await fallback(), 'mock')
   }
 }

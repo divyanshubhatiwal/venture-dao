@@ -1,6 +1,7 @@
 import express from 'express'
 import cors from 'cors'
 import 'dotenv/config'
+import { botStatus, getBot } from './botService.js'
 import {
   cancelOrder,
   getBalances,
@@ -112,6 +113,123 @@ app.post(
 app.delete(
   '/api/venues/delta/order',
   asHandler((req) => cancelOrder(resolveConfig(), { id: req.body?.id, productId: req.body?.productId })),
+)
+
+/* ---------- autonomous bot ----------
+   The engine lives in the server process, so these routes command a bot that
+   keeps running with every browser closed. Paper mode is the only mode wired
+   here: the Delta adapter is not yet verified against the exchange, and an
+   unverified execution path must not be reachable from an HTTP route. */
+
+app.get('/api/bot/status', asHandler(() => botStatus()))
+
+app.post(
+  '/api/bot/start',
+  asHandler(() => {
+    const { engine } = getBot()
+    if (engine.isEmergencyStopped()) {
+      const err = new Error('Emergency stop is latched. Clear it explicitly before starting.')
+      err.status = 409
+      throw err
+    }
+    engine.start()
+    return botStatus()
+  }),
+)
+
+app.post(
+  '/api/bot/pause',
+  asHandler(() => {
+    getBot().engine.pause()
+    return botStatus()
+  }),
+)
+
+/** Runs exactly one cycle. Lets the dashboard prove the pipeline without waiting. */
+app.post(
+  '/api/bot/step',
+  asHandler(async () => {
+    const result = await getBot().engine.runCycle()
+    return { result, status: botStatus() }
+  }),
+)
+
+app.post(
+  '/api/bot/emergency-stop',
+  asHandler((req) => {
+    getBot().engine.engageEmergencyStop(req.body?.reason || 'dashboard')
+    return botStatus()
+  }),
+)
+
+/** Deliberately a separate route from pause: clearing a latch is its own act. */
+app.post(
+  '/api/bot/resume',
+  asHandler(() => {
+    getBot().engine.clearEmergencyStop()
+    return botStatus()
+  }),
+)
+
+app.put(
+  '/api/bot/config',
+  asHandler((req) => {
+    const allowed = [
+      'startingBalance',
+      'targetBalance',
+      'riskPerTradePercent',
+      'maxDrawdownPercent',
+      'dailyLossLimitPercent',
+      'maxOpenPositions',
+      'maxTradesPerDay',
+      'maxLeverage',
+      'maxPositionPercent',
+      'dailyTargetPercent',
+      'dailyLossLimitPercent',
+      'entryCutoffMinutes',
+      'minRewardToCost',
+    ]
+    const patch = {}
+    for (const key of allowed) {
+      if (req.body?.[key] == null) continue
+      const value = Number(req.body[key])
+      // Reject rather than coerce: a NaN risk limit silently becomes no limit.
+      if (!Number.isFinite(value) || value <= 0) {
+        const err = new Error(`${key} must be a positive number.`)
+        err.status = 400
+        throw err
+      }
+      patch[key] = value
+    }
+
+    // Session fields are not numbers, so they need their own validation rather
+    // than being dropped by the numeric loop above — which is what silently
+    // made the trading window unconfigurable.
+    for (const key of ['sessionStart', 'sessionEnd']) {
+      if (req.body?.[key] == null) continue
+      if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(String(req.body[key]))) {
+        const err = new Error(`${key} must be HH:MM in 24-hour form.`)
+        err.status = 400
+        throw err
+      }
+      patch[key] = String(req.body[key])
+    }
+    if (req.body?.timeZone != null) {
+      try {
+        new Intl.DateTimeFormat('en-GB', { timeZone: String(req.body.timeZone) })
+      } catch {
+        const err = new Error('timeZone is not a recognised IANA zone.')
+        err.status = 400
+        throw err
+      }
+      patch.timeZone = String(req.body.timeZone)
+    }
+    if (req.body?.continueAfterTarget != null) patch.continueAfterTarget = Boolean(req.body.continueAfterTarget)
+    if (req.body?.flattenAtSessionEnd != null) patch.flattenAtSessionEnd = Boolean(req.body.flattenAtSessionEnd)
+
+    getBot('default', patch)
+    return botStatus()
+  }),
 )
 
 app.listen(PORT, () => {

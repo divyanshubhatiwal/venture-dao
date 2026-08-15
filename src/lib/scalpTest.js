@@ -1,4 +1,4 @@
-import { DEFAULT_FEE_BPS, DEFAULT_SLIPPAGE_BPS } from './venues'
+import { DEFAULT_FEE_BPS, DEFAULT_SLIPPAGE_BPS } from './venues.js'
 
 /**
  * Simulates the "take a tiny profit, never take a loss" strategy.

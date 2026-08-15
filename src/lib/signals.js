@@ -1,4 +1,4 @@
-import { atr, bollinger, ema, macd, rangePosition, rsi, sma, swingLevels } from './indicators'
+import { atr, bollinger, ema, macd, rangePosition, rsi, sma, swingLevels } from './indicators.js'
 
 /**
  * Signal engine: turns real candles into a transparent, auditable read.

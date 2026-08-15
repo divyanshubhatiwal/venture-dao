@@ -1,5 +1,5 @@
-import { DEFAULT_FEE_BPS, DEFAULT_SLIPPAGE_BPS } from './venues'
-import { MIN_CANDLES, generateSignal } from './signals'
+import { DEFAULT_FEE_BPS, DEFAULT_SLIPPAGE_BPS } from './venues.js'
+import { MIN_CANDLES, generateSignal } from './signals.js'
 
 /**
  * Walk-forward backtest of the signal engine.

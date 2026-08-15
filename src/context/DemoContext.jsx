@@ -44,7 +44,7 @@ export function DemoProvider({ children }) {
       if (fn) return fn(arg)
       await wait(125)
     }
-    if (import.meta.env.DEV) console.warn(`[demo] action never registered: ${name}`)
+    if (import.meta.env?.DEV) console.warn(`[demo] action never registered: ${name}`)
     return undefined
   }, [])
 

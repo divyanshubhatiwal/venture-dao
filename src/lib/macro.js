@@ -13,9 +13,9 @@
  * historically accompany drawdowns are present.
  */
 
-import { INDICES } from './stockApi'
+import { INDICES } from './stockApi.js'
 
-const YF = import.meta.env.VITE_STOCK_PROXY || '/yf'
+const YF = import.meta.env?.VITE_STOCK_PROXY || '/yf'
 const COINGECKO = 'https://api.coingecko.com/api/v3'
 const BINANCE_FUTURES = 'https://fapi.binance.com'
 const ALTERNATIVE_ME = 'https://api.alternative.me'

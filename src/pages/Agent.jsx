@@ -33,6 +33,7 @@ import { DEFAULT_GOAL_CONFIG, computeGoalState, computeStreaks, normaliseConfig 
 import { decide, formatDecision } from '../lib/agent/decision'
 import { monteCarlo } from '../lib/agent/monteCarlo'
 import { backtest } from '../lib/backtest'
+import { publishBotStatus } from '../lib/botStatus'
 
 const UNIVERSE = [
   { symbol: 'ETH', assetClass: 'crypto' },
@@ -125,6 +126,15 @@ export default function Agent() {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(config))
   }, [config])
+
+  // Report run state so other screens can show it. Read-only: publishing has
+  // no effect on the agent itself.
+  useEffect(() => {
+    publishBotStatus({
+      mode: stopped ? 'paused' : running ? 'running' : 'off',
+      reason: stopped ? 'Operator stopped the agent' : null,
+    })
+  }, [running, stopped])
 
   useEffect(() => {
     let alive = true
