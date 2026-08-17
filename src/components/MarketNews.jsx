@@ -3,6 +3,12 @@ import { AlertTriangle, ExternalLink, Loader2, Newspaper, RefreshCw, Sparkles } 
 import { Card, EmptyState, SectionTitle, Skeleton } from './ui'
 import { relativeTime } from '../lib/format'
 
+/* The dev server proxies /api to the backend, so a bare relative path works
+   locally and then 404s in production, where the frontend and backend are on
+   different hosts. Every other client in this app already goes through
+   VITE_API_URL; this one did not. */
+const API = import.meta.env?.VITE_API_URL || ''
+
 /**
  * Live market news.
  *
@@ -84,7 +90,7 @@ export default function MarketNews() {
   const load = useCallback(async () => {
     setRefreshing(true)
     try {
-      const res = await fetch('/api/news/markets')
+      const res = await fetch(`${API}/api/news/markets`)
       const json = await res.json()
       if (!mounted.current) return
       if (!json.ok) throw new Error(json.error || `HTTP ${res.status}`)
