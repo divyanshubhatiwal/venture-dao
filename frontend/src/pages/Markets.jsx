@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Activity, AlertTriangle, ArrowDownRight, ArrowUpRight, Coins, Globe, RefreshCw, Wifi, WifiOff } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Activity, AlertTriangle, ArrowDownRight, ArrowRight, ArrowUpRight, Coins, Globe, RefreshCw, TrendingUp, Wifi, WifiOff, Zap } from 'lucide-react'
 import { Card, PageHeader, SectionTitle, Skeleton } from '../components/ui'
 import CandleChart from '../components/CandleChart'
 import ChartToolbar from '../components/ChartToolbar'
 import BotSignalPanel from '../components/BotSignalPanel'
-import TradingTabs from '../components/TradingTabs'
 import TradingStatusBar from '../components/TradingStatusBar'
-import BotControlPanel from '../components/BotControlPanel'
 import LiveValue from '../components/LiveValue'
 import { useMarket } from '../context/MarketContext'
 import { RANGES, WATCHLIST, getCandles } from '../lib/market/marketApi'
@@ -26,9 +25,9 @@ import { num, usd } from '../lib/format'
 const CHART_REFRESH_MS = 30_000
 
 const TABS = [
-  { key: 'crypto', label: 'Crypto', hint: 'The asset class the treasury holds' },
-  { key: 'stocks', label: 'Stocks', hint: 'Listed comparables for the AI thesis' },
-  { key: 'indices', label: 'World indices', hint: 'Nine benchmarks across six markets' },
+  { key: 'crypto', label: 'Crypto Assets', icon: Coins, hint: 'Treasury crypto assets & live Binance feed' },
+  { key: 'stocks', label: 'Tech & Equities', icon: TrendingUp, hint: 'Major tech & AI market equities' },
+  { key: 'indices', label: 'World Indices', icon: Globe, hint: 'Global benchmarks across 6 regions' },
 ]
 
 // Fixed decimals so a ticking price does not change width and shift the layout.
@@ -280,6 +279,18 @@ export default function Markets() {
     loadEquities()
   }
 
+  // Keyboard navigation for sub-tabs (1, 2, 3)
+  useEffect(() => {
+    const handleKey = (e) => {
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return
+      if (e.key === '1') setTab('crypto')
+      if (e.key === '2') setTab('stocks')
+      if (e.key === '3') setTab('indices')
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [])
+
   const loading = isCrypto ? market.loading : equityLoading
   const intraday = chart?.intraday ?? (isCrypto && (rangeKey === '1D' || rangeKey === '1W'))
   const treasuryUsd = market.valueEth(DAO_STATS.treasuryEth, DAO_STATS.treasuryUsd)
@@ -301,20 +312,34 @@ export default function Markets() {
         }
       />
 
-      {/* Asset class */}
-      <div className="mb-4 flex flex-wrap items-center gap-1.5">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            title={t.hint}
-            className={`rounded-xl px-3.5 py-2 text-sm font-semibold transition ${
-              tab === t.key ? 'bg-gradient-to-r from-brand-500/25 to-accent/15 text-white' : 'text-slate-500 hover:bg-white/[0.05] hover:text-slate-300'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
+      {/* Enhanced Segmented Tab Switcher */}
+      <div className="mb-5 flex flex-wrap items-center gap-2 rounded-2xl border border-white/[0.08] bg-black/40 p-1.5 backdrop-blur-xl">
+        {TABS.map((t, idx) => {
+          const Icon = t.icon
+          const active = tab === t.key
+          return (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              title={t.hint}
+              className={`group flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all duration-200 ${
+                active
+                  ? 'bg-gradient-to-r from-brand-600 to-accent text-white shadow-lg shadow-brand-500/25 scale-[1.02]'
+                  : 'text-slate-400 hover:bg-white/[0.05] hover:text-white'
+              }`}
+            >
+              <Icon size={14} className={active ? 'text-white' : 'text-slate-500 group-hover:text-slate-300'} />
+              <span>{t.label}</span>
+              <kbd
+                className={`ml-1 rounded px-1.5 py-0.5 font-mono text-[9px] transition ${
+                  active ? 'bg-black/30 text-brand-200' : 'bg-white/[0.06] text-slate-500 group-hover:text-slate-300'
+                }`}
+              >
+                {idx + 1}
+              </kbd>
+            </button>
+          )
+        })}
       </div>
 
       {quotesMeta.stale && (
@@ -329,8 +354,8 @@ export default function Markets() {
       )}
 
       {/* Terminal: chart is the primary element, signal panel beside it */}
-      <div ref={terminalRef} className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
-        <Card className="flex min-w-0 flex-col p-4 sm:p-5">
+      <div ref={terminalRef} className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_320px] items-start">
+        <Card className="min-w-0 p-4 sm:p-5">
           {/* Instrument header */}
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
@@ -405,9 +430,9 @@ export default function Markets() {
             />
           </div>
 
-          <div className="mt-3 min-w-0 flex-1" data-demo="candles">
+          <div className="mt-3 min-w-0" data-demo="candles">
             {chartLoading ? (
-              <Skeleton className="h-[460px] w-full" />
+              <Skeleton className="h-[440px] w-full" />
             ) : (
               <CandleChart
                 ref={chartRef}
@@ -415,7 +440,7 @@ export default function Markets() {
                 intraday={intraday}
                 currency={currency}
                 format={priceOf}
-                height={isFullscreen ? Math.max(460, window.innerHeight - 300) : 460}
+                height={isFullscreen ? Math.max(460, window.innerHeight - 300) : 440}
                 indicators={indicators}
                 livePrice={isCrypto ? (active?.price ?? null) : null}
                 levels={signal.ok && signal.direction !== 'flat' ? signal.levels : null}
@@ -442,30 +467,50 @@ export default function Markets() {
           </div>
         </Card>
 
-        <div className="min-w-0 xl:sticky xl:top-20 xl:self-start">
+        <div className="space-y-4 min-w-0 xl:sticky xl:top-20 xl:self-start">
           {chartLoading ? (
-            <Skeleton className="h-[420px] w-full" />
+            <Skeleton className="h-[280px] w-full" />
           ) : (
             <BotSignalPanel signal={signal} priceOf={priceOf} collapsible={!isDesktop} />
           )}
-          {/* The bot that would act on the signal above sits directly beneath
-              it, so the read and the thing executing on it stay together. */}
-          <div className="mt-4">
-            <BotControlPanel />
-          </div>
+
+          {/* Quick Trade Transition */}
+          <Link
+            to="/trading"
+            className="flex items-center justify-between rounded-xl border border-brand-500/40 bg-gradient-to-r from-brand-600/20 to-accent/20 p-3.5 text-xs font-semibold text-white transition hover:border-brand-500/70 hover:from-brand-600/30 hover:to-accent/30 shadow-md"
+          >
+            <div className="flex items-center gap-2">
+              <Zap size={15} className="text-brand-300" />
+              <span>Execute {symbol} on Trade Desk</span>
+            </div>
+            <ArrowRight size={14} className="text-brand-300" />
+          </Link>
+
+          {/* Live Market Overview Snapshot */}
+          <Card className="p-4">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Market Snapshot · {symbol}</p>
+            <div className="mt-2.5 grid grid-cols-2 gap-2 text-xs">
+              <div className="rounded-lg border border-white/[0.05] bg-black/20 p-2 text-center">
+                <span className="text-[10px] text-slate-500">24h High</span>
+                <p className="mt-0.5 font-mono font-semibold text-slate-200">{stats?.high ? priceOf(stats.high) : '—'}</p>
+              </div>
+              <div className="rounded-lg border border-white/[0.05] bg-black/20 p-2 text-center">
+                <span className="text-[10px] text-slate-500">24h Low</span>
+                <p className="mt-0.5 font-mono font-semibold text-slate-200">{stats?.low ? priceOf(stats.low) : '—'}</p>
+              </div>
+            </div>
+            <div className="mt-2 flex items-center justify-between border-t border-white/[0.05] pt-2 text-[10px] text-slate-400">
+              <span>24h Volume</span>
+              <span className="font-mono text-slate-200">{stats?.volume ? `${num(stats.volume, 2)}M` : '—'}</span>
+            </div>
+          </Card>
         </div>
       </div>
-
-      {/* Blotter, directly under the chart so it stays reachable */}
-      <div className="mt-4">
-        <TradingTabs />
-      </div>
-
 
       {/* World indices grid */}
       {tab === 'indices' && (
         <Card className="mt-4 p-5">
-          <SectionTitle icon={Globe} title="World indices" hint="Click any benchmark to load its candles" />
+          <SectionTitle icon={Globe} title="World benchmarks" hint="Click any benchmark to load its live candles above" />
           {equityLoading && !rows.length ? (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {Array.from({ length: 9 }).map((_, i) => (
@@ -482,125 +527,139 @@ export default function Markets() {
         </Card>
       )}
 
-      {/* Watchlist + treasury */}
-      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
-        <Card className="p-5">
-          <SectionTitle icon={Coins} title="Treasury at market" hint="DAO holdings valued at the live ETH rate" />
-          <p className="font-mono text-2xl font-bold text-white">{treasuryUsd == null ? '—' : usd(treasuryUsd, { compact: true })}</p>
-          <p className="mt-1 text-xs text-slate-500">
-            {DAO_STATS.treasuryEth} ETH × {market.ethPrice ? cryptoPrice(market.ethPrice) : '—'}
-          </p>
-          <dl className="mt-4 space-y-2.5 border-t border-white/[0.06] pt-4 text-xs">
-            {[
-              ['Deployed to positions', '285 ETH'],
-              ['Open proposals request', '100 ETH'],
-              ['Unallocated', `${(DAO_STATS.treasuryEth - 285).toFixed(2)} ETH`],
-            ].map(([k, v]) => (
-              <div key={k} className="flex items-center justify-between gap-3">
-                <dt className="text-slate-500">{k}</dt>
-                <dd className="font-mono text-slate-200">{v}</dd>
-              </div>
-            ))}
-          </dl>
-          <p className="mt-4 text-[11px] leading-relaxed text-slate-600">
-            Treasury and position sizes are demo figures; the price they are valued at is real.
-          </p>
-        </Card>
+      {/* Crypto Treasury Metrics Banner */}
+      {isCrypto && (
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <Card className="p-4">
+            <div className="flex items-center gap-2 text-slate-400 text-xs font-semibold">
+              <Coins size={14} className="text-brand-400" />
+              <span>DAO Treasury Valuation</span>
+            </div>
+            <p className="mt-2 font-mono text-2xl font-bold text-white">
+              {treasuryUsd == null ? '—' : usd(treasuryUsd, { compact: true })}
+            </p>
+            <p className="mt-0.5 text-[11px] text-slate-500">
+              {DAO_STATS.treasuryEth} ETH @ {market.ethPrice ? cryptoPrice(market.ethPrice) : '—'}
+            </p>
+          </Card>
 
-        <Card className="overflow-hidden p-0 xl:col-span-2">
-          <div className="p-5 pb-3">
-            <SectionTitle
-              icon={Activity}
-              title={isCrypto ? 'Crypto watchlist' : tab === 'stocks' ? 'Equity watchlist' : 'Index levels'}
-              hint={isCrypto ? 'Sectors the DAO invests across' : 'Click any row to load its candles'}
-            />
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[600px] text-sm">
-              <thead>
-                <tr className="border-y border-white/[0.07] bg-white/[0.02]">
-                  {(isCrypto ? ['Asset', 'Price', '24h', '7d', 'Market cap', '7d trend'] : ['Symbol', 'Name', 'Price', 'Session', 'Trend']).map(
-                    (h, i) => (
-                      <th
-                        key={h}
-                        className={`px-5 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 ${
-                          i === 0 || (!isCrypto && i === 1) ? 'text-left' : 'text-right'
-                        }`}
-                      >
-                        {h}
-                      </th>
-                    ),
-                  )}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/[0.05]">
-                {loading && !rows.length
-                  ? Array.from({ length: 6 }).map((_, i) => (
-                      <tr key={i}>
-                        <td colSpan={6} className="px-5 py-3">
-                          <Skeleton className="h-6 w-full" />
-                        </td>
-                      </tr>
-                    ))
-                  : rows.map((t) => (
-                      <tr
-                        key={t.symbol}
-                        onClick={() => select({ symbol: t.symbol })}
-                        className={`cursor-pointer transition hover:bg-white/[0.04] ${symbol === t.symbol ? 'bg-white/[0.03]' : ''}`}
-                      >
-                        {isCrypto ? (
-                          <>
-                            <td className="px-5 py-3">
-                              <div className="flex items-center gap-2.5">
-                                <span className="font-mono text-xs font-bold text-slate-100">{t.symbol}</span>
-                                <span className="truncate text-xs text-slate-500">{t.name}</span>
-                              </div>
-                            </td>
-                            <td className="px-5 py-3 text-right font-mono text-slate-100">
-                              <LiveValue value={t.price} format={cryptoPrice} />
-                            </td>
-                            <td className="px-5 py-3 text-right">
-                              <Change value={t.change24h} />
-                            </td>
-                            <td className="px-5 py-3 text-right">
-                              <Change value={t.change7d} />
-                            </td>
-                            <td className="px-5 py-3 text-right font-mono text-slate-400">
-                              {t.marketCap ? usd(t.marketCap, { compact: true }) : '—'}
-                            </td>
-                          </>
-                        ) : (
-                          <>
-                            <td className="px-5 py-3 font-mono text-xs font-bold text-slate-100">{t.symbol}</td>
-                            <td className="px-5 py-3">
-                              <span className="text-xs text-slate-300">{t.name}</span>
-                              <span className="ml-2 text-[10px] text-slate-600">{t.region}</span>
-                            </td>
-                            <td className="px-5 py-3 text-right font-mono text-slate-100">
-                              <LiveValue value={t.price} format={(v) => formatPrice(v, t.currency)} />
-                            </td>
-                            <td className="px-5 py-3 text-right">
-                              <Change value={t.change} />
-                            </td>
-                          </>
-                        )}
-                        <td className="py-3 pr-5 text-right">
-                          <div className="flex justify-end">
-                            <Sparkline points={t.sparkline} up={(isCrypto ? (t.change7d ?? t.change24h) : t.change) >= 0} />
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-              </tbody>
-            </table>
-          </div>
-          <p className="border-t border-white/[0.06] px-5 py-3 text-[11px] text-slate-600">
-            {isCrypto
-              ? 'Prices from CoinGecko, candles from Binance — public endpoints, no API key.'
-              : 'Equities and indices from Yahoo Finance, bridged through the app server because Yahoo sends no CORS headers.'}
-          </p>
-        </Card>
-      </div>
+          <Card className="p-4">
+            <div className="flex items-center gap-2 text-slate-400 text-xs font-semibold">
+              <Activity size={14} className="text-emerald-400" />
+              <span>Capital Allocation</span>
+            </div>
+            <p className="mt-2 font-mono text-lg font-bold text-emerald-400">285 ETH Deployed</p>
+            <div className="mt-1 flex items-center justify-between text-[11px] text-slate-400">
+              <span>Proposals: 100 ETH</span>
+              <span>Available: {(DAO_STATS.treasuryEth - 285).toFixed(1)} ETH</span>
+            </div>
+          </Card>
+
+          <Card className="p-4">
+            <div className="flex items-center gap-2 text-slate-400 text-xs font-semibold">
+              <Globe size={14} className="text-sky-400" />
+              <span>Execution &amp; Settlement</span>
+            </div>
+            <p className="mt-2 font-mono text-lg font-bold text-slate-200">Binance / Delta</p>
+            <p className="mt-0.5 text-[11px] text-slate-500">Sub-second streaming · True USD Peg</p>
+          </Card>
+        </div>
+      )}
+
+      {/* Full-Width Watchlist Table */}
+      <Card className="mt-4 overflow-hidden p-0">
+        <div className="p-5 pb-3">
+          <SectionTitle
+            icon={Activity}
+            title={isCrypto ? 'Crypto Market Watchlist' : tab === 'stocks' ? 'Tech & AI Equities Watchlist' : 'Global Index Performance'}
+            hint="Click any asset row to chart candles and evaluate bot signals"
+          />
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[600px] text-sm">
+            <thead>
+              <tr className="border-y border-white/[0.07] bg-white/[0.02]">
+                {(isCrypto ? ['Asset', 'Price', '24h Change', '7d Change', 'Market Cap', '7d Trend'] : ['Symbol', 'Name', 'Price', 'Session', 'Trend']).map(
+                  (h, i) => (
+                    <th
+                      key={h}
+                      className={`px-5 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 ${
+                        i === 0 || (!isCrypto && i === 1) ? 'text-left' : 'text-right'
+                      }`}
+                    >
+                      {h}
+                    </th>
+                  ),
+                )}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/[0.05]">
+              {loading && !rows.length
+                ? Array.from({ length: 6 }).map((_, i) => (
+                    <tr key={i}>
+                      <td colSpan={6} className="px-5 py-3">
+                        <Skeleton className="h-6 w-full" />
+                      </td>
+                    </tr>
+                  ))
+                : rows.map((t) => (
+                    <tr
+                      key={t.symbol}
+                      onClick={() => select({ symbol: t.symbol })}
+                      className={`cursor-pointer transition hover:bg-white/[0.04] ${symbol === t.symbol ? 'bg-white/[0.03]' : ''}`}
+                    >
+                      {isCrypto ? (
+                        <>
+                          <td className="px-5 py-3">
+                            <div className="flex items-center gap-2.5">
+                              <span className="font-mono text-xs font-bold text-slate-100">{t.symbol}</span>
+                              <span className="truncate text-xs text-slate-500">{t.name}</span>
+                            </div>
+                          </td>
+                          <td className="px-5 py-3 text-right font-mono text-slate-100">
+                            <LiveValue value={t.price} format={cryptoPrice} />
+                          </td>
+                          <td className="px-5 py-3 text-right">
+                            <Change value={t.change24h} />
+                          </td>
+                          <td className="px-5 py-3 text-right">
+                            <Change value={t.change7d} />
+                          </td>
+                          <td className="px-5 py-3 text-right font-mono text-slate-400">
+                            {t.marketCap ? usd(t.marketCap, { compact: true }) : '—'}
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="px-5 py-3 font-mono text-xs font-bold text-slate-100">{t.symbol}</td>
+                          <td className="px-5 py-3">
+                            <span className="text-xs text-slate-300">{t.name}</span>
+                            <span className="ml-2 text-[10px] text-slate-600">{t.region}</span>
+                          </td>
+                          <td className="px-5 py-3 text-right font-mono text-slate-100">
+                            <LiveValue value={t.price} format={(v) => formatPrice(v, t.currency)} />
+                          </td>
+                          <td className="px-5 py-3 text-right">
+                            <Change value={t.change} />
+                          </td>
+                        </>
+                      )}
+                      <td className="py-3 pr-5 text-right">
+                        <div className="flex justify-end">
+                          <Sparkline points={t.sparkline} up={(isCrypto ? (t.change7d ?? t.change24h) : t.change) >= 0} />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="border-t border-white/[0.06] px-5 py-3 text-[11px] text-slate-600">
+          {isCrypto
+            ? 'Prices from CoinGecko, candles from Binance — public endpoints, real-time telemetry.'
+            : 'Equities and indices from Yahoo Finance, bridged through the app server.'}
+        </p>
+      </Card>
     </div>
   )
 }

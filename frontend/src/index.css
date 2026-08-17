@@ -284,3 +284,322 @@
     transform: translateY(-14px) rotateY(10deg) translateZ(35px);
   }
 }
+
+/* ── Complete Light Mode Theme Engine ── */
+html.light body {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+  background-image:
+    radial-gradient(900px 500px at 12% -10%, rgba(99, 102, 241, 0.06), transparent 60%),
+    radial-gradient(800px 500px at 92% 0%, rgba(168, 85, 247, 0.05), transparent 55%) !important;
+}
+
+/* Surfaces, Containers & Sidebars */
+html.light aside {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  border-color: #e2e8f0 !important;
+}
+
+html.light header {
+  background-color: rgba(255, 255, 255, 0.9) !important;
+  border-color: #e2e8f0 !important;
+}
+
+html.light footer {
+  border-color: #e2e8f0 !important;
+  color: #64748b !important;
+}
+
+html.light .bg-ink-950,
+html.light .bg-ink-900,
+html.light .bg-ink-850,
+html.light .bg-ink-800,
+html.light .bg-ink-700 {
+  background-color: #ffffff !important;
+}
+
+html.light .card {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05), 0 2px 6px -1px rgba(0, 0, 0, 0.03) !important;
+}
+
+html.light .card::before {
+  background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.15) 30%, rgba(168, 85, 247, 0.15) 70%, transparent) !important;
+}
+
+/* Universal Border Adapters */
+html.light .border-white\/\[0\.04\],
+html.light .border-white\/\[0\.05\],
+html.light .border-white\/\[0\.06\],
+html.light .border-white\/\[0\.07\],
+html.light .border-white\/\[0\.08\],
+html.light .border-white\/\[0\.09\],
+html.light .border-white\/10,
+html.light .border-white\/15,
+html.light .border-white\/20,
+html.light .border-white\/25,
+html.light .divide-white\/\[0\.04\],
+html.light .divide-white\/\[0\.05\],
+html.light .divide-white\/\[0\.06\],
+html.light .divide-white\/\[0\.07\],
+html.light .divide-white\/10 {
+  border-color: #e2e8f0 !important;
+}
+
+/* Universal Background Adapters */
+html.light .bg-white\/\[0\.02\],
+html.light .bg-white\/\[0\.03\],
+html.light .bg-white\/\[0\.04\],
+html.light .bg-white\/\[0\.05\],
+html.light .bg-white\/\[0\.06\],
+html.light .bg-white\/\[0\.08\],
+html.light .bg-white\/5,
+html.light .bg-white\/10 {
+  background-color: #f1f5f9 !important;
+}
+
+html.light .bg-white\/15,
+html.light .bg-white\/20 {
+  background-color: #e2e8f0 !important;
+}
+
+html.light .bg-black\/20,
+html.light .bg-black\/30,
+html.light .bg-black\/40,
+html.light .bg-black\/60,
+html.light .bg-black\/75 {
+  background-color: #f1f5f9 !important;
+}
+
+html.light .bg-ink-950\/85,
+html.light .bg-ink-950\/60,
+html.light .bg-ink-950\/40,
+html.light .bg-ink-900\/80,
+html.light .bg-ink-900\/90 {
+  background-color: #ffffff !important;
+}
+
+/* Typography Hierarchy in Light Mode — Sharp & Legible */
+html.light .text-white,
+html.light .text-slate-100 {
+  color: #0f172a !important;
+}
+
+html.light .text-slate-200 {
+  color: #1e293b !important;
+}
+
+html.light .text-slate-300 {
+  color: #334155 !important;
+}
+
+html.light .text-slate-400 {
+  color: #475569 !important;
+}
+
+html.light .text-slate-500 {
+  color: #64748b !important;
+}
+
+html.light .text-slate-600 {
+  color: #475569 !important;
+}
+
+/* Gradient Hero / Accent Text in Light Mode */
+html.light .grad-text {
+  background: linear-gradient(135deg, #4338ca 0%, #6366f1 50%, #9333ea 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+}
+
+/* Primary Gradient Buttons & Active Pill Buttons Text must stay White */
+html.light .btn-primary,
+html.light .btn-primary *,
+html.light button[class*="from-brand-600"],
+html.light button[class*="from-brand-600"] *,
+html.light button[class*="from-brand-500"],
+html.light button[class*="from-brand-500"] * {
+  color: #ffffff !important;
+}
+
+/* Semi-transparent text overrides */
+html.light [class*="text-white/"],
+html.light [class*="text-slate-100/"],
+html.light [class*="text-slate-200/"],
+html.light [class*="text-slate-300/"] {
+  color: #1e293b !important;
+}
+
+/* All Amber Alert Banners & Warnings in Light Mode */
+html.light [class*="text-amber-100"],
+html.light [class*="text-amber-200"],
+html.light [class*="text-amber-300"],
+html.light .text-amber-100,
+html.light .text-amber-200 {
+  color: #92400e !important;
+}
+
+/* All Emerald / Success Alert Banners in Light Mode */
+html.light [class*="text-emerald-100"],
+html.light [class*="text-emerald-200"],
+html.light [class*="text-emerald-300"],
+html.light .text-emerald-100,
+html.light .text-emerald-200 {
+  color: #065f46 !important;
+}
+
+/* All Rose / Stop / Error Alert Banners in Light Mode */
+html.light [class*="text-rose-100"],
+html.light [class*="text-rose-200"],
+html.light [class*="text-rose-300"],
+html.light .text-rose-100,
+html.light .text-rose-200 {
+  color: #991b1b !important;
+}
+
+/* High-Contrast Financial Colors in Light Mode */
+html.light .text-brand-300,
+html.light .text-brand-200 {
+  color: #4f46e5 !important;
+}
+
+html.light .text-emerald-400,
+html.light .text-emerald-300 {
+  color: #059669 !important;
+}
+
+html.light .text-rose-400,
+html.light .text-rose-300 {
+  color: #dc2626 !important;
+}
+
+html.light .text-amber-400,
+html.light .text-amber-300 {
+  color: #d97706 !important;
+}
+
+html.light .text-sky-400,
+html.light .text-sky-300 {
+  color: #0284c7 !important;
+}
+
+/* Soft Color Pill Backgrounds in Light Mode */
+html.light .bg-brand-500\/10,
+html.light .bg-brand-500\/15 {
+  background-color: #eef2ff !important;
+  border-color: rgba(99, 102, 241, 0.3) !important;
+}
+
+html.light .bg-emerald-500\/10,
+html.light .bg-emerald-500\/15 {
+  background-color: #ecfdf5 !important;
+  border-color: rgba(16, 185, 129, 0.3) !important;
+}
+
+html.light .bg-rose-500\/10,
+html.light .bg-rose-500\/15 {
+  background-color: #fef2f2 !important;
+  border-color: rgba(244, 63, 94, 0.3) !important;
+}
+
+html.light .bg-amber-500\/10,
+html.light .bg-amber-500\/15,
+html.light .bg-amber-500\/\[0\.07\],
+html.light .bg-amber-500\/\[0\.08\] {
+  background-color: #fffbeb !important;
+  border-color: rgba(245, 158, 11, 0.3) !important;
+}
+
+html.light .bg-sky-500\/10,
+html.light .bg-sky-500\/15 {
+  background-color: #f0f9ff !important;
+  border-color: rgba(14, 165, 233, 0.3) !important;
+}
+
+/* Inputs & Forms in Light Mode */
+html.light input,
+html.light textarea,
+html.light select,
+html.light .input {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+html.light input::placeholder,
+html.light textarea::placeholder {
+  color: #64748b !important;
+}
+
+html.light input:focus,
+html.light textarea:focus,
+html.light select:focus,
+html.light .input:focus {
+  border-color: #6366f1 !important;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15) !important;
+}
+
+/* Buttons in Light Mode */
+html.light .btn-ghost {
+  border-color: #cbd5e1 !important;
+  background-color: #f1f5f9 !important;
+  color: #1e293b !important;
+}
+
+html.light .btn-ghost:hover {
+  background-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+html.light .kbd {
+  background-color: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+  color: #475569 !important;
+}
+
+html.light .chip {
+  border-color: #cbd5e1 !important;
+  background-color: #f1f5f9 !important;
+  color: #334155 !important;
+}
+
+html.light .label {
+  color: #475569 !important;
+}
+
+/* Table Enhancements in Light Mode */
+html.light thead tr {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+}
+
+html.light thead th {
+  color: #475569 !important;
+}
+
+html.light tbody tr:hover {
+  background-color: #f1f5f9 !important;
+}
+
+html.light .skeleton {
+  background-color: rgba(0, 0, 0, 0.06) !important;
+}
+
+/* Financial Charts & Recharts in Light Mode */
+html.light .recharts-cartesian-axis-tick text {
+  fill: #475569 !important;
+}
+
+html.light .recharts-cartesian-grid line {
+  stroke: rgba(0, 0, 0, 0.06) !important;
+}
+
+html.light .recharts-default-tooltip {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1) !important;
+}
+
+

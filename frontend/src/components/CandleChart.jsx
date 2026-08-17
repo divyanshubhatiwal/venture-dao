@@ -338,15 +338,15 @@ const CandleChart = forwardRef(function CandleChart(
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={data} margin={MARGIN}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.06)" vertical={false} />
-              <XAxis dataKey="label" tickLine={false} axisLine={false} interval={Math.max(0, Math.floor(data.length / 10) - 1)} minTickGap={14} />
+              <XAxis dataKey="label" hide={hasVolume || subPanes > 0} tickLine={false} axisLine={false} interval={Math.max(0, Math.floor(data.length / 10) - 1)} minTickGap={14} height={hasVolume || subPanes > 0 ? 0 : 24} />
               <YAxis domain={domain} tickLine={false} axisLine={false} width={Y_WIDTH} orientation="right" tickFormatter={(v) => fmtValue(v, currency)} />
               <Tooltip content={<CandleTooltip currency={currency} fmt={format} />} cursor={{ stroke: 'rgba(255,255,255,.25)', strokeDasharray: '3 3' }} />
 
               {indicators.bb && (
                 <>
-                  <Line type="monotone" dataKey="bbUpper" name="BB upper" stroke="#94a3b8" strokeWidth={1} dot={false} connectNulls isAnimationActive={false} />
-                  <Line type="monotone" dataKey="bbLower" name="BB lower" stroke="#94a3b8" strokeWidth={1} dot={false} connectNulls isAnimationActive={false} />
-                  <Line type="monotone" dataKey="bbMid" name="BB mid" stroke="#64748b" strokeWidth={1} strokeDasharray="3 3" dot={false} connectNulls isAnimationActive={false} />
+                  <Line type="linear" dataKey="bbUpper" name="BB upper" stroke="#94a3b8" strokeWidth={1} dot={false} connectNulls isAnimationActive={false} />
+                  <Line type="linear" dataKey="bbLower" name="BB lower" stroke="#94a3b8" strokeWidth={1} dot={false} connectNulls isAnimationActive={false} />
+                  <Line type="linear" dataKey="bbMid" name="BB mid" stroke="#64748b" strokeWidth={1} strokeDasharray="3 3" dot={false} connectNulls isAnimationActive={false} />
                 </>
               )}
 
@@ -356,8 +356,8 @@ const CandleChart = forwardRef(function CandleChart(
                 ))}
               </Bar>
 
-              {indicators.ema20 && <Line type="monotone" dataKey="ema20" name="EMA 20" stroke="#818cf8" strokeWidth={1.5} dot={false} connectNulls isAnimationActive={false} />}
-              {indicators.sma50 && <Line type="monotone" dataKey="sma50" name="SMA 50" stroke="#f0abfc" strokeWidth={1.5} strokeDasharray="4 3" dot={false} connectNulls isAnimationActive={false} />}
+              {indicators.ema20 && <Line type="linear" dataKey="ema20" name="EMA 20" stroke="#818cf8" strokeWidth={1.5} dot={false} connectNulls isAnimationActive={false} />}
+              {indicators.sma50 && <Line type="linear" dataKey="sma50" name="SMA 50" stroke="#f0abfc" strokeWidth={1.5} strokeDasharray="4 3" dot={false} connectNulls isAnimationActive={false} />}
 
               {/* Bot levels. Entry/stop/target come from the signal engine and
                   are never drawn unless it produced them. */}
@@ -387,10 +387,10 @@ const CandleChart = forwardRef(function CandleChart(
       </div>
 
       {hasVolume && width > 0 && (
-        <div className="mt-1 h-[72px]">
+        <div className="h-[80px]">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data} margin={MARGIN}>
-              <XAxis dataKey="label" hide />
+              <XAxis dataKey="label" hide={subPanes > 0} tickLine={false} axisLine={false} interval={Math.max(0, Math.floor(data.length / 10) - 1)} minTickGap={14} height={subPanes > 0 ? 0 : 20} />
               <YAxis width={Y_WIDTH} orientation="right" tickLine={false} axisLine={false} tickFormatter={(v) => `${Math.round(v)}M`} />
               <Tooltip content={<CandleTooltip currency={currency} fmt={format} />} cursor={{ fill: 'rgba(255,255,255,.04)' }} />
               <Bar dataKey="volume" isAnimationActive={false}>
@@ -405,7 +405,7 @@ const CandleChart = forwardRef(function CandleChart(
 
       {indicators.rsi && width > 0 && (
         <SubPane title="RSI 14" data={data}>
-          <Line type="monotone" dataKey="rsi" stroke="#fbbf24" strokeWidth={1.4} dot={false} connectNulls isAnimationActive={false} />
+          <Line type="linear" dataKey="rsi" stroke="#fbbf24" strokeWidth={1.4} dot={false} connectNulls isAnimationActive={false} />
           <ReferenceLine y={70} stroke="rgba(251,113,133,.4)" strokeDasharray="3 3" />
           <ReferenceLine y={30} stroke="rgba(52,211,153,.4)" strokeDasharray="3 3" />
         </SubPane>
@@ -414,14 +414,14 @@ const CandleChart = forwardRef(function CandleChart(
       {indicators.macd && width > 0 && (
         <SubPane title="MACD 12,26,9" data={data} domain={['auto', 'auto']}>
           <ReferenceLine y={0} stroke="rgba(255,255,255,.15)" />
-          <Line type="monotone" dataKey="macdLine" stroke="#818cf8" strokeWidth={1.4} dot={false} connectNulls isAnimationActive={false} />
-          <Line type="monotone" dataKey="macdSignal" stroke="#f0abfc" strokeWidth={1.2} strokeDasharray="3 3" dot={false} connectNulls isAnimationActive={false} />
+          <Line type="linear" dataKey="macdLine" stroke="#818cf8" strokeWidth={1.4} dot={false} connectNulls isAnimationActive={false} />
+          <Line type="linear" dataKey="macdSignal" stroke="#f0abfc" strokeWidth={1.2} strokeDasharray="3 3" dot={false} connectNulls isAnimationActive={false} />
         </SubPane>
       )}
 
       {indicators.atr && width > 0 && (
         <SubPane title="ATR 14" data={data} domain={['auto', 'auto']}>
-          <Line type="monotone" dataKey="atr" stroke="#22d3ee" strokeWidth={1.4} dot={false} connectNulls isAnimationActive={false} />
+          <Line type="linear" dataKey="atr" stroke="#22d3ee" strokeWidth={1.4} dot={false} connectNulls isAnimationActive={false} />
         </SubPane>
       )}
     </div>

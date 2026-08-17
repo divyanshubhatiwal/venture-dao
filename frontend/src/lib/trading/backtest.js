@@ -156,10 +156,38 @@ function summarise(trades, equityCurve, startingCash, candles) {
     maxDrawdown = Math.max(maxDrawdown, ((peak - equity) / peak) * 100)
   })
 
+  // Returns series for Sharpe & Sortino calculation
+  const returns = []
+  for (let i = 1; i < equityCurve.length; i++) {
+    const prev = equityCurve[i - 1].equity
+    const curr = equityCurve[i].equity
+    if (prev > 0) returns.push((curr - prev) / prev)
+  }
+
+  const meanReturn = returns.length ? returns.reduce((a, b) => a + b, 0) / returns.length : 0
+  const variance = returns.length ? returns.reduce((a, b) => a + Math.pow(b - meanReturn, 2), 0) / returns.length : 0
+  const stdDev = Math.sqrt(variance)
+
+  const downsideReturns = returns.filter((r) => r < 0)
+  const downsideVariance = downsideReturns.length ? downsideReturns.reduce((a, b) => a + Math.pow(b, 2), 0) / downsideReturns.length : 0
+  const downsideStdDev = Math.sqrt(downsideVariance)
+
+  // Annualized using ~8760 hourly bars/yr or 252 trading days
+  const annualFactor = Math.sqrt(8760)
+  const sharpeRatio = stdDev > 0 ? +((meanReturn / stdDev) * annualFactor).toFixed(2) : 0
+  const sortinoRatio = downsideStdDev > 0 ? +((meanReturn / downsideStdDev) * annualFactor).toFixed(2) : 0
+  const totalReturn = +((netPnl / startingCash) * 100).toFixed(2)
+  const calmarRatio = maxDrawdown > 0 ? +(totalReturn / maxDrawdown).toFixed(2) : totalReturn > 0 ? 10.0 : 0
+
+  // 95% Historical Value at Risk (VaR)
+  const sortedReturns = [...returns].sort((a, b) => a - b)
+  const varIndex = Math.floor(sortedReturns.length * 0.05)
+  const var95 = sortedReturns.length ? +(Math.abs(sortedReturns[varIndex] ?? 0) * 100).toFixed(2) : 0
+
   // Buy and hold over the same window, as the benchmark that matters.
   const first = candles[MIN_CANDLES]
   const last = candles[candles.length - 1]
-  const buyHold = ((last.close - first.close) / first.close) * 100
+  const buyHold = first && last ? ((last.close - first.close) / first.close) * 100 : 0
 
   return {
     trades,
@@ -168,15 +196,17 @@ function summarise(trades, equityCurve, startingCash, candles) {
       tradeCount: trades.length,
       winRate: trades.length ? +((wins.length / trades.length) * 100).toFixed(1) : null,
       netPnl: +netPnl.toFixed(2),
-      totalReturn: +((netPnl / startingCash) * 100).toFixed(2),
+      totalReturn,
       buyHoldReturn: +buyHold.toFixed(2),
-      // Gross profit ÷ gross loss. Below 1.0 means the strategy loses money.
       profitFactor: grossLoss > 0 ? +(grossWin / grossLoss).toFixed(2) : grossWin > 0 ? Infinity : 0,
-      // Average P&L per trade — the number that decides whether to trade at all.
       expectancy: trades.length ? +(netPnl / trades.length).toFixed(2) : 0,
       avgWin: wins.length ? +(grossWin / wins.length).toFixed(2) : 0,
       avgLoss: losses.length ? +(grossLoss / losses.length).toFixed(2) : 0,
       maxDrawdown: +maxDrawdown.toFixed(2),
+      sharpeRatio,
+      sortinoRatio,
+      calmarRatio,
+      var95,
       avgBars: trades.length ? +(trades.reduce((s, t) => s + t.bars, 0) / trades.length).toFixed(1) : 0,
       stopped: trades.filter((t) => t.reason === 'stop').length,
       targeted: trades.filter((t) => t.reason === 'target').length,

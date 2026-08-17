@@ -16,10 +16,13 @@ const Markets = lazy(() => import('./pages/Markets'))
 const Trading = lazy(() => import('./pages/Trading'))
 const Macro = lazy(() => import('./pages/Macro'))
 const Agent = lazy(() => import('./pages/Agent'))
+const Backtest = lazy(() => import('./pages/Backtest'))
+const Governance = lazy(() => import('./pages/Governance'))
 
 import Layout from './components/Layout'
 import ErrorBoundary from './components/ErrorBoundary'
 import ProtectedRoute from './components/ProtectedRoute'
+import { ThemeProvider } from './context/ThemeContext'
 import { AuthProvider } from './context/AuthContext'
 import { WalletProvider } from './context/WalletContext'
 import { ToastProvider } from './context/ToastContext'
@@ -41,15 +44,16 @@ function RouteFallback() {
 export default function App() {
   return (
     <ErrorBoundary>
-      <ToastProvider>
-        <WalletProvider>
-          <AuthProvider>
-            <MarketProvider>
-              <TradingProvider>
-                <EpisodeProvider>
-                  <DemoProvider>
-                    <Suspense fallback={<RouteFallback />}>
-                    <Routes>
+      <ThemeProvider>
+        <ToastProvider>
+          <WalletProvider>
+            <AuthProvider>
+              <MarketProvider>
+                <TradingProvider>
+                  <EpisodeProvider>
+                    <DemoProvider>
+                      <Suspense fallback={<RouteFallback />}>
+                      <Routes>
                       {/* Public. The landing page is the front door; login sits
                           outside Layout because it has its own chrome. */}
                       <Route index element={<Landing />} />
@@ -62,8 +66,10 @@ export default function App() {
                           <Route path="dashboard" element={<Dashboard />} />
                           <Route path="markets" element={<Markets />} />
                           <Route path="trading" element={<Trading />} />
-                          <Route path="macro" element={<Macro />} />
                           <Route path="agent" element={<Agent />} />
+                          <Route path="backtest" element={<Backtest />} />
+                          <Route path="governance" element={<Governance />} />
+                          <Route path="macro" element={<Macro />} />
                         </Route>
                       </Route>
 
@@ -77,6 +83,7 @@ export default function App() {
           </AuthProvider>
         </WalletProvider>
       </ToastProvider>
+      </ThemeProvider>
     </ErrorBoundary>
   )
 }

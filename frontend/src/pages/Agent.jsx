@@ -19,18 +19,20 @@ import {
   XCircle,
 } from 'lucide-react'
 import { Card, ChartTooltip, Chip, PageHeader, SectionTitle, Skeleton } from '../components/ui'
-import LiveValue from '../components/LiveValue'
+import LiveValue, { LiveBadge } from '../components/LiveValue'
 import DeltaStatus from '../components/DeltaStatus'
 import { deltaTradable } from '../lib/trading/venues'
 import { useTrading } from '../context/TradingContext'
 import { useMarket } from '../context/MarketContext'
 import { useDemo } from '../context/DemoContext'
 import { useToast } from '../context/ToastContext'
+import { useTheme } from '../context/ThemeContext'
 import { getCandles } from '../lib/market/marketApi'
 import { getStockCandles } from '../lib/market/stockApi'
 import { getMacro } from '../lib/market/macro'
 import { DEFAULT_GOAL_CONFIG, computeGoalState, computeStreaks, normaliseConfig } from '../lib/agent/goalManager'
 import { decide, formatDecision } from '../lib/agent/decision'
+import { deriveState } from '../lib/agent/stateMachine'
 import { monteCarlo } from '../lib/agent/monteCarlo'
 import { backtest } from '../lib/trading/backtest'
 import { publishBotStatus } from '../lib/agent/botStatus'
@@ -169,6 +171,10 @@ export default function Agent() {
   }, [goalState.protectedFloor, floor])
 
   const streaks = useMemo(() => computeStreaks(trading.trades), [trading.trades])
+  const state = useMemo(
+    () => deriveState({ goalState, streaks, agentStopped: stopped }),
+    [goalState, streaks, stopped],
+  )
   const latest = decisions[0] ?? null
 
   /* ---------- the decision cycle ---------- */
@@ -245,6 +251,11 @@ export default function Agent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running, stopped])
 
+  // Run initial evaluation on load so Latest Decision is populated right away
+  useEffect(() => {
+    runCycle()
+  }, [runCycle])
+
   // Judge mode runs one decision cycle from the walkthrough script.
   useEffect(() => registerAction('agent:cycle', () => runCycle()), [registerAction, runCycle])
 
@@ -303,6 +314,51 @@ export default function Agent() {
     toast({ tone: 'info', title: 'Goal updated', description: `${money(next.startingBalance)} → ${money(next.targetBalance)}` })
   }
 
+  const applyPreset = (preset) => {
+    let nextDraft = { ...draft }
+    if (preset === 'conservative') {
+      nextDraft = {
+        ...nextDraft,
+        startingBalance: 100,
+        targetBalance: 150,
+        maxDrawdownPercent: 10,
+        riskPerTradePercent: 1,
+        dailyLossLimitPercent: 3,
+        minRiskReward: 2.0,
+      }
+    } else if (preset === 'balanced') {
+      nextDraft = {
+        ...nextDraft,
+        startingBalance: 100,
+        targetBalance: 200,
+        maxDrawdownPercent: 15,
+        riskPerTradePercent: 2,
+        dailyLossLimitPercent: 5,
+        minRiskReward: 1.8,
+      }
+    } else if (preset === 'aggressive') {
+      nextDraft = {
+        ...nextDraft,
+        startingBalance: 100,
+        targetBalance: 300,
+        maxDrawdownPercent: 25,
+        riskPerTradePercent: 3,
+        dailyLossLimitPercent: 8,
+        minRiskReward: 1.5,
+      }
+    }
+    setDraft(nextDraft)
+    const next = normaliseConfig(nextDraft)
+    setConfig(next)
+    setFloor(null)
+    setPeak(next.startingBalance)
+    toast({
+      tone: 'success',
+      title: `${preset.toUpperCase()} Goal Applied`,
+      description: `${money(next.startingBalance)} → ${money(next.targetBalance)} target`,
+    })
+  }
+
   const equityCurve = useMemo(
     () =>
       trading.equityCurve.map((p) => ({
@@ -312,25 +368,49 @@ export default function Agent() {
     [trading.equityCurve, config.startingBalance, trading.startingCash],
   )
 
-  const state = latest?.state
+  // Keyboard navigation for sub-tabs (1, 2, 3)
+  useEffect(() => {
+    const handleKey = (e) => {
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return
+      if (e.key === '1') setAgentTab('controls')
+      if (e.key === '2') setAgentTab('simulation')
+      if (e.key === '3') setAgentTab('logs')
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [])
+
+  const { isDark } = useTheme()
   const blocked = latest && !latest.approved
 
   return (
     <div className="animate-fade-up">
       <PageHeader
-        eyebrow="Practice account"
-        title="Trading bot"
-        subtitle="Protecting your money comes first, profit second. The safety checks run last and can cancel any trade."
+        eyebrow="Autonomous intelligence"
+        title="AI Agent"
+        subtitle="Monitors the signal engine, estimates expected value, tests recommendations on historical data and trades toward a target."
         actions={
           <>
-            {regime && (
-              <span className="btn-ghost pointer-events-none">
-                <Compass size={15} />
-                {regime.label}
-              </span>
-            )}
-            <button onClick={killSwitch} className="btn border border-rose-500/40 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20">
-              <OctagonX size={15} />
+            <LiveBadge live={running} label={stopped ? 'safe mode' : running ? 'evaluating' : 'standby'} />
+            <button
+              onClick={() => {
+                if (stopped) return
+                setRunning((r) => !r)
+              }}
+              disabled={stopped}
+              className="btn-ghost"
+            >
+              {running ? <Square size={14} /> : <Play size={14} />}
+              {running ? 'Pause' : 'Start'}
+            </button>
+            <button
+              onClick={() => {
+                setStopped(true)
+                setRunning(false)
+                toast({ tone: 'warn', title: 'Agent halted', description: 'Safe mode triggered manually.' })
+              }}
+              className="btn border border-rose-500/40 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20"
+            >
               STOP AGENT
             </button>
           </>
@@ -338,49 +418,60 @@ export default function Agent() {
       />
 
       {stopped && (
-        <div className="mb-4 flex items-start gap-3 rounded-xl border border-rose-500/30 bg-rose-500/[0.08] p-4">
-          <OctagonX size={16} className="mt-0.5 shrink-0 text-rose-400" />
-          <div className="text-xs leading-relaxed text-rose-100/90">
+        <div className={`mb-4 flex items-start gap-3 rounded-xl border p-4 ${isDark ? 'border-rose-500/30 bg-rose-500/[0.08] text-rose-100/90' : 'border-rose-300 bg-rose-50 text-rose-900 shadow-sm'}`}>
+          <OctagonX size={16} className={`mt-0.5 shrink-0 ${isDark ? 'text-rose-400' : 'text-rose-600'}`} />
+          <div className="text-xs leading-relaxed">
             <p className="font-semibold">Safe mode — agent stopped.</p>
-            <p className="mt-1 text-rose-100/70">No new orders will be placed. Reset below to start a new cycle.</p>
+            <p className={`mt-1 ${isDark ? 'text-rose-100/70' : 'text-rose-700'}`}>No new orders will be placed. Reset below to start a new cycle.</p>
           </div>
         </div>
       )}
 
-      <div className="mb-4 flex items-start gap-3 rounded-xl border border-amber-500/25 bg-amber-500/[0.07] p-4">
-        <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-400" />
-        <p className="text-xs leading-relaxed text-amber-100/80">
-          <span className="font-semibold text-amber-100">The target is a goal, not a guarantee.</span> Markets are uncertain: the
+      {/* Target & Risk Disclaimer Banner */}
+      <div className={`mb-4 flex items-start gap-3 rounded-xl border p-4 ${isDark ? 'border-amber-500/25 bg-amber-500/[0.07] text-amber-100/80' : 'border-amber-300 bg-amber-50 text-amber-900 shadow-sm'}`}>
+        <AlertTriangle size={16} className={`mt-0.5 shrink-0 ${isDark ? 'text-amber-400' : 'text-amber-600'}`} />
+        <p className={`text-xs leading-relaxed ${isDark ? 'text-amber-100/90' : 'text-amber-900'}`}>
+          <span className={`font-bold ${isDark ? 'text-amber-100' : 'text-amber-950'}`}>The target is a goal, not a guarantee.</span> Markets are uncertain: the
           balance can fall, the target may never be reached, and the loss from peak limit can halt trading permanently. Everything here
           runs on a practice account with virtual money.
         </p>
       </div>
 
-      {/* Sub-Tabs */}
-      <div className="mt-5 flex flex-wrap items-center gap-2 border-b border-white/[0.08] pb-3">
+      {/* Enhanced Segmented Tab Switcher */}
+      <div className={`mt-5 mb-5 flex flex-wrap items-center gap-2 rounded-2xl border p-1.5 backdrop-blur-xl ${isDark ? 'border-white/[0.08] bg-black/40' : 'border-slate-200 bg-white/90 shadow-sm'}`}>
         {[
-          { id: 'controls', label: 'Autopilot Controls & Goal', icon: Bot },
-          { id: 'simulation', label: 'Monte Carlo Goal Simulation', icon: Gauge, badge: mc?.probabilityOfTarget != null ? `${mc.probabilityOfTarget}% win` : null },
-          { id: 'logs', label: 'Decision Logs & Audit', icon: ServerCog, badge: decisions.length },
-        ].map(({ id, label, icon: Icon, badge }) => (
-          <button
-            key={id}
-            onClick={() => setAgentTab(id)}
-            className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition ${
-              agentTab === id
-                ? 'bg-gradient-to-r from-brand-600 to-accent text-white shadow-md'
-                : 'border border-white/10 bg-white/[0.03] text-slate-400 hover:border-white/20 hover:text-white'
-            }`}
-          >
-            <Icon size={14} />
-            <span>{label}</span>
-            {badge != null && (
-              <span className="rounded-full bg-white/20 px-1.5 py-0.2 font-mono text-[10px] text-white">
-                {badge}
-              </span>
-            )}
-          </button>
-        ))}
+          { id: 'controls', label: 'Autopilot Controls & Goal', icon: Bot, num: '1' },
+          { id: 'simulation', label: 'Monte Carlo Simulation', icon: Gauge, badge: mc?.probabilityOfTarget != null ? `${mc.probabilityOfTarget}% win` : null, num: '2' },
+          { id: 'logs', label: 'Decision Logs & Audit', icon: ServerCog, badge: decisions.length, num: '3' },
+        ].map(({ id, label, icon: Icon, badge, num }) => {
+          const active = agentTab === id
+          return (
+            <button
+              key={id}
+              onClick={() => setAgentTab(id)}
+              className={`group flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all duration-200 ${
+                active
+                  ? 'bg-gradient-to-r from-brand-600 to-accent text-white shadow-lg shadow-brand-500/25 scale-[1.02]'
+                  : isDark ? 'text-slate-400 hover:bg-white/[0.05] hover:text-white' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+              }`}
+            >
+              <Icon size={14} className={active ? 'text-white' : isDark ? 'text-slate-500 group-hover:text-slate-300' : 'text-slate-400 group-hover:text-slate-700'} />
+              <span>{label}</span>
+              {badge != null && (
+                <span className={`rounded-full px-1.5 py-0.5 font-mono text-[10px] ${active ? 'bg-white/20 text-white' : isDark ? 'bg-white/10 text-slate-400' : 'bg-slate-200 text-slate-700'}`}>
+                  {badge}
+                </span>
+              )}
+              <kbd
+                className={`ml-1 rounded px-1.5 py-0.5 font-mono text-[9px] transition ${
+                  active ? 'bg-black/30 text-brand-200' : isDark ? 'bg-white/[0.06] text-slate-500 group-hover:text-slate-300' : 'bg-slate-100 text-slate-500 group-hover:text-slate-700'
+                }`}
+              >
+                {num}
+              </kbd>
+            </button>
+          )
+        })}
       </div>
 
       {agentTab === 'controls' && (
@@ -434,11 +525,12 @@ export default function Agent() {
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
-        {/* Latest decision */}
-        <Card className="p-5 xl:col-span-2" data-demo="decision">
-          <SectionTitle
-            icon={Bot}
-            title="Latest decision"
+        {/* Left Column: Latest Decision + Universe Opportunity Matrix */}
+        <div className="space-y-4 xl:col-span-2">
+          <Card className="p-5" data-demo="decision">
+            <SectionTitle
+              icon={Bot}
+              title="Latest decision"
             hint="Find it → challenge it → check the limits, in that order"
             action={
               thinking ? (
@@ -557,99 +649,224 @@ export default function Agent() {
           )}
         </Card>
 
-        {/* Controls */}
-        <div className="space-y-4">
-          <Card className="p-5">
-            <SectionTitle icon={ShieldCheck} title="Start and stop" />
+        {/* Candidate Evaluations in Current Cycle */}
+        <Card className="overflow-hidden p-0">
+          <div className="p-5 pb-3">
+            <SectionTitle
+              icon={Gauge}
+              title="Universe Opportunity Ranking"
+              hint="Ranked by expected value (EV) in latest evaluation cycle"
+            />
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-y border-white/[0.07] bg-white/[0.02]">
+                  <th className="px-4 py-2.5 text-left font-semibold uppercase text-slate-500">Asset</th>
+                  <th className="px-4 py-2.5 text-left font-semibold uppercase text-slate-500">Signal</th>
+                  <th className="px-4 py-2.5 text-left font-semibold uppercase text-slate-500">Verdict</th>
+                  <th className="px-4 py-2.5 text-right font-semibold uppercase text-slate-500">Confidence</th>
+                  <th className="px-4 py-2.5 text-right font-semibold uppercase text-slate-500">Expected Value</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/[0.05]">
+                {decisions.slice(0, 4).map((d) => (
+                  <tr key={d.symbol} className="transition hover:bg-white/[0.03]">
+                    <td className="px-4 py-2.5 font-mono font-bold text-slate-100">{d.symbol}</td>
+                    <td className="px-4 py-2.5">
+                      <Chip tone={d.approved ? tone.emerald : tone.slate}>{d.action}</Chip>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <Chip tone={d.approved ? tone.emerald : d.critic?.verdict === 'veto' ? tone.rose : tone.amber}>
+                        {d.approved ? 'APPROVED' : d.critic?.verdict ? `Critic: ${d.critic.verdict}` : 'PASSED'}
+                      </Chip>
+                    </td>
+                    <td className="px-4 py-2.5 text-right font-mono text-slate-300">
+                      {d.confidence != null ? `${d.confidence}%` : '—'}
+                    </td>
+                    <td className="px-4 py-2.5 text-right font-mono font-semibold text-brand-300">
+                      {d.expectedValue?.evR != null ? `${d.expectedValue.evR}R` : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      </div>
+
+      {/* Controls */}
+      <div className="space-y-4">
+        <Card className="p-5">
+          <div className="flex items-center justify-between">
+            <SectionTitle icon={Bot} title="Autopilot Engine" hint="Auto-evaluates every 2 mins" />
+            <Chip tone={running ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300' : 'border-white/15 bg-white/5 text-slate-400'}>
+              {stopped ? 'Safe Mode' : running ? 'Active' : 'Standby'}
+            </Chip>
+          </div>
+
+          <button
+            onClick={() => {
+              if (stopped) return
+              setRunning((r) => !r)
+            }}
+            disabled={stopped}
+            className={`btn mt-3.5 w-full border text-xs font-semibold ${
+              running ? 'border-rose-500/40 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20' : 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20'
+            }`}
+          >
+            {running ? <Square size={14} /> : <Play size={14} />}
+            {running ? 'Pause Autopilot' : 'Start Autopilot'}
+          </button>
+
+          {stopped && (
             <button
               onClick={() => {
-                if (stopped) return
-                setRunning((r) => !r)
+                setStopped(false)
+                trading.reset()
+                setFloor(null)
+                setPeak(config.startingBalance)
+                setDecisions([])
+                toast({ tone: 'info', title: 'New cycle', description: 'Account reset and safe mode cleared.' })
               }}
-              disabled={stopped}
-              className={`btn w-full border ${
-                running ? 'border-rose-500/40 bg-rose-500/10 text-rose-300' : 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
-              }`}
+              className="btn-ghost btn-sm mt-3 w-full"
             >
-              {running ? <Square size={14} /> : <Play size={14} />}
-              {running ? 'Pause agent' : 'Start agent'}
+              <RotateCcw size={13} />
+              Start a new goal cycle
             </button>
-            <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
-              Runs a full decision cycle across {UNIVERSE.length} assets every two minutes, acts on the best surviving
-              opportunity, and does nothing at all when none survive.
-            </p>
-            {stopped && (
-              <button
-                onClick={() => {
-                  setStopped(false)
-                  trading.reset()
-                  setFloor(null)
-                  setPeak(config.startingBalance)
-                  setDecisions([])
-                  toast({ tone: 'info', title: 'New cycle', description: 'Account reset and safe mode cleared.' })
-                }}
-                className="btn-ghost btn-sm mt-3 w-full"
-              >
-                <RotateCcw size={13} />
-                Start a new goal cycle
-              </button>
-            )}
-          </Card>
+          )}
+
+          {/* Execution Venue & Hedge Fund Algo */}
+          <div className="mt-4 border-t border-white/[0.06] pt-3 space-y-3">
+            <div>
+              <p className="label mb-1.5">Trade Execution Venue</p>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { id: 'paper', label: 'Paper Sim', note: 'Internal simulator' },
+                  { id: 'delta', label: 'Delta Testnet', note: 'Real order signing' },
+                ].map((v) => (
+                  <button
+                    key={v.id}
+                    onClick={() => setVenue(v.id)}
+                    className={`rounded-lg border p-2.5 text-left transition ${
+                      venue === v.id
+                        ? 'border-brand-500/50 bg-brand-500/[0.12] text-white'
+                        : 'border-white/[0.07] bg-white/[0.02] text-slate-400 hover:border-white/20'
+                    }`}
+                  >
+                    <p className="text-xs font-semibold">{v.label}</p>
+                    <p className="mt-0.5 text-[10px] text-slate-500">{v.note}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="label mb-1.5">Execution Algorithm</p>
+              <div className="rounded-lg border border-brand-500/30 bg-brand-500/10 p-2 text-[11px] text-brand-200">
+                <span className="font-semibold">⚡ TWAP/VWAP Slicing:</span> Slices Autopilot orders over 15-min intervals to prevent front-running and eliminate slippage.
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        {/* Delta live connection status if active */}
+        {venue === 'delta' && <DeltaStatus />}
 
           <Card className="p-5">
-            <SectionTitle icon={ServerCog} title="Where trades go" hint="Where the agent's orders go" />
-            <div className="grid grid-cols-2 gap-2">
+            <SectionTitle icon={Target} title="Goal & Risk Strategy" hint="Quick presets or custom balance target" />
+            
+            {/* Quick Preset Buttons */}
+            <div className="mt-3 grid grid-cols-3 gap-2">
               {[
-                { id: 'paper', label: 'Paper', note: 'Internal simulator' },
-                { id: 'delta', label: 'Delta', note: 'Real orders, testnet' },
-              ].map((v) => (
+                { id: 'conservative', label: 'Conservative', target: '$150', risk: '1%' },
+                { id: 'balanced', label: 'Balanced', target: '$200', risk: '2%' },
+                { id: 'aggressive', label: 'Growth', target: '$300', risk: '3%' },
+              ].map((p) => (
                 <button
-                  key={v.id}
-                  onClick={() => setVenue(v.id)}
-                  className={`rounded-xl border p-3 text-left transition ${
-                    venue === v.id
-                      ? 'border-brand-500/50 bg-brand-500/[0.1] text-white'
-                      : 'border-white/[0.07] bg-white/[0.02] text-slate-400 hover:border-white/20'
-                  }`}
+                  key={p.id}
+                  type="button"
+                  onClick={() => applyPreset(p.id)}
+                  className="group rounded-xl border border-white/10 bg-white/[0.03] p-2.5 text-center transition hover:border-brand-500/50 hover:bg-brand-500/10"
                 >
-                  <p className="text-sm font-semibold">{v.label}</p>
-                  <p className="mt-0.5 text-[10px] leading-relaxed text-slate-500">{v.note}</p>
+                  <p className="text-xs font-semibold text-slate-200 group-hover:text-brand-300">{p.label}</p>
+                  <p className="mt-0.5 font-mono text-[10px] text-slate-400">{p.target} · {p.risk}</p>
                 </button>
               ))}
             </div>
-            <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
-              {venue === 'delta'
-                ? 'Approved trades are sent to Delta as real orders. ETH, BTC and SOL only — anything else falls back to paper.'
-                : 'Orders fill in the local simulator against live prices. Nothing reaches an exchange.'}
-            </p>
-          </Card>
 
-          <DeltaStatus />
-
-          <Card className="p-5">
-            <SectionTitle icon={Target} title="Your goal" />
-            <form onSubmit={applyConfig} className="space-y-3">
-              {[
-                ['Starting capital', 'startingBalance', 1],
-                ['Target balance', 'targetBalance', 1],
-                ['Max loss from peak %', 'maxDrawdownPercent', 0.5],
-                ['Risk per trade %', 'riskPerTradePercent', 0.05],
-                ['Daily loss limit %', 'dailyLossLimitPercent', 0.25],
-                ['Min risk/reward', 'minRiskReward', 0.1],
-              ].map(([label, key, step]) => (
-                <div key={key}>
-                  <label className="label">{label}</label>
+            <form onSubmit={applyConfig} className="mt-4 space-y-3">
+              <div className="grid grid-cols-2 gap-2.5">
+                <div>
+                  <label className="label">Starting ($)</label>
                   <input
                     type="number"
-                    step={step}
-                    value={draft[key]}
-                    onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))}
-                    className="input mt-1 py-2"
+                    step={1}
+                    value={draft.startingBalance}
+                    onChange={(e) => setDraft((d) => ({ ...d, startingBalance: e.target.value }))}
+                    className="input mt-1 py-1.5 font-mono text-xs"
                   />
                 </div>
-              ))}
-              <button type="submit" className="btn-primary w-full">
-                Apply &amp; reset cycle
+                <div>
+                  <label className="label">Target ($)</label>
+                  <input
+                    type="number"
+                    step={1}
+                    value={draft.targetBalance}
+                    onChange={(e) => setDraft((d) => ({ ...d, targetBalance: e.target.value }))}
+                    className="input mt-1 py-1.5 font-mono text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2.5">
+                <div>
+                  <label className="label">Risk / Trade (%)</label>
+                  <input
+                    type="number"
+                    step={0.05}
+                    value={draft.riskPerTradePercent}
+                    onChange={(e) => setDraft((d) => ({ ...d, riskPerTradePercent: e.target.value }))}
+                    className="input mt-1 py-1.5 font-mono text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="label">Max Loss Stop (%)</label>
+                  <input
+                    type="number"
+                    step={0.5}
+                    value={draft.maxDrawdownPercent}
+                    onChange={(e) => setDraft((d) => ({ ...d, maxDrawdownPercent: e.target.value }))}
+                    className="input mt-1 py-1.5 font-mono text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2.5">
+                <div>
+                  <label className="label">Daily Limit (%)</label>
+                  <input
+                    type="number"
+                    step={0.25}
+                    value={draft.dailyLossLimitPercent}
+                    onChange={(e) => setDraft((d) => ({ ...d, dailyLossLimitPercent: e.target.value }))}
+                    className="input mt-1 py-1.5 font-mono text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="label">Min R:R Ratio</label>
+                  <input
+                    type="number"
+                    step={0.1}
+                    value={draft.minRiskReward}
+                    onChange={(e) => setDraft((d) => ({ ...d, minRiskReward: e.target.value }))}
+                    className="input mt-1 py-1.5 font-mono text-xs"
+                  />
+                </div>
+              </div>
+
+              <button type="submit" className="btn-primary mt-2 w-full py-2 text-xs">
+                Save &amp; Recalibrate Goal
               </button>
             </form>
           </Card>

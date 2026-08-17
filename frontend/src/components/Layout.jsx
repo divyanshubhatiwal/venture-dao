@@ -6,56 +6,59 @@ import {
   CandlestickChart,
   CheckCircle2,
   Compass,
+  Cpu,
   Database,
   Globe,
-  KeyRound,
   LayoutDashboard,
   LogOut,
   Menu,
+  Moon,
   Search,
   Server,
   Shield,
-  Target,
+  Sun,
+  Vote,
   X,
   Zap,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import { useTheme } from '../context/ThemeContext'
 import CommandPalette from './CommandPalette'
 import DemoOverlay, { DemoLaunchButton } from './DemoOverlay'
-import { Modal, StatusBadge } from './ui'
+import { Modal } from './ui'
 import { usingMocks } from '../lib/api/api'
 
 const API_URL = import.meta.env?.VITE_API_URL || ''
 
-const NAV = [
+const NAV_ITEMS = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/trading', label: 'Trade', icon: CandlestickChart },
+  { to: '/trading', label: 'Trade Desk', icon: CandlestickChart },
   { to: '/agent', label: 'AI Agent', icon: Bot },
+  { to: '/backtest', label: 'Strategy Studio', icon: Cpu },
+  { to: '/governance', label: 'Governance', icon: Vote },
   { to: '/markets', label: 'Markets', icon: Activity },
-  { to: '/macro', label: 'News & Macro', icon: Compass },
+  { to: '/macro', label: 'Macro & News', icon: Compass },
 ]
 
 function Brand() {
   return (
-    <Link to="/dashboard" className="flex items-center gap-2.5">
-      <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-brand-500 to-accent shadow-glow transition hover:scale-105">
-        <svg viewBox="0 0 64 64" className="h-5 w-5">
-          <path d="M16 18l16 30 16-30" fill="none" stroke="white" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
+    <Link to="/dashboard" className="flex items-center gap-2.5 px-2">
+      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-brand-500 to-accent shadow-sm">
+        <svg viewBox="0 0 64 64" className="h-4 w-4 text-white">
+          <path d="M16 18l16 30 16-30" fill="none" stroke="currentColor" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
-      </span>
+      </div>
       <div>
-        <p className="text-[15px] font-semibold tracking-tight text-white">Venture DAO</p>
-        <p className="text-[10px] font-medium tracking-wide text-brand-400">INSTITUTIONAL AI</p>
+        <p className="text-sm font-bold tracking-tight text-slate-100 dark:text-slate-100">Venture DAO</p>
+        <p className="text-[10px] font-medium tracking-wide text-brand-400">Institutional Quant</p>
       </div>
     </Link>
   )
 }
 
-/**
- * Real-time Backend & Atlas connectivity hook.
- */
+/** Real-time Backend & Atlas connectivity hook. */
 function useBackendHealth() {
-  const [status, setStatus] = useState({ online: true, ping: 35, at: null })
+  const [status, setStatus] = useState({ online: true, ping: 32, at: null })
 
   useEffect(() => {
     let alive = true
@@ -75,7 +78,7 @@ function useBackendHealth() {
       }
     }
     check()
-    const timer = setInterval(check, 20_000)
+    const timer = setInterval(check, 25_000)
     return () => {
       alive = false
       clearInterval(timer)
@@ -85,7 +88,7 @@ function useBackendHealth() {
   return status
 }
 
-/** Signed-in identity plus the way out. */
+/** Clean Minimal User Menu */
 function UserMenu() {
   const { user, signOut, initials } = useAuth()
   if (!user) return null
@@ -99,50 +102,68 @@ function UserMenu() {
   }
 
   return (
-    <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-2 py-1.5 backdrop-blur-md">
-      <span className="grid h-7 w-7 place-items-center rounded-lg bg-gradient-to-br from-brand-600 to-accent text-[11px] font-bold text-white shadow-sm">
-        {initials}
-      </span>
-      <div className="hidden leading-tight sm:block">
-        <p className="max-w-[120px] truncate text-xs font-semibold text-slate-100">{user.name || 'Trader'}</p>
-        <p className="text-[10px] text-slate-500">{user.email}</p>
+    <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-2 py-1.5 backdrop-blur-md">
+        <span className="grid h-6 w-6 place-items-center rounded-lg bg-gradient-to-br from-brand-600 to-accent text-[10px] font-bold text-white shadow-sm">
+          {initials}
+        </span>
+        <span className="hidden text-xs font-semibold text-slate-200 sm:inline max-w-[100px] truncate">
+          {user.name || 'Trader'}
+        </span>
+        <button
+          onClick={handleSignOut}
+          className="rounded p-1 text-slate-400 hover:text-rose-400 transition"
+          aria-label="Sign out"
+          title="Sign out"
+        >
+          <LogOut size={13} />
+        </button>
       </div>
-      <button
-        onClick={handleSignOut}
-        className="rounded-md p-1.5 text-slate-500 transition hover:bg-white/10 hover:text-slate-200"
-        aria-label="Sign out"
-        title="Sign out"
-      >
-        <LogOut size={14} />
-      </button>
     </div>
   )
 }
 
-function NavItems({ onNavigate }) {
+function NavList({ onNavigate }) {
+  const { isDark } = useTheme()
+
   return (
     <nav className="flex flex-col gap-1">
-      {NAV.map(({ to, label, icon: Icon, end }) => (
+      {NAV_ITEMS.map(({ to, label, icon: Icon, end }, idx) => (
         <NavLink
           key={to}
           to={to}
           end={end}
           onClick={onNavigate}
           className={({ isActive }) =>
-            `group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium transition ${
+            `group flex items-center gap-3 rounded-xl px-3 py-2 text-[13px] font-medium transition duration-150 ${
               isActive
-                ? 'bg-gradient-to-r from-brand-500/20 to-accent/10 text-white shadow-sm border border-brand-500/20'
-                : 'text-slate-400 hover:bg-white/[0.04] hover:text-slate-200'
+                ? 'bg-brand-500/15 text-brand-300 font-semibold border border-brand-500/25 shadow-sm'
+                : isDark
+                  ? 'text-slate-400 hover:bg-white/[0.04] hover:text-slate-200'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
             }`
           }
         >
           {({ isActive }) => (
             <>
-              <Icon size={16} className={isActive ? 'text-brand-400' : 'text-slate-500 group-hover:text-slate-300'} />
-              <span>{label}</span>
-              {isActive && (
-                <span className="ml-auto h-1.5 w-1.5 rounded-full bg-brand-400 shadow-[0_0_8px_rgba(129,140,248,0.8)]" />
-              )}
+              <Icon
+                size={16}
+                className={`transition-colors ${
+                  isActive
+                    ? 'text-brand-400'
+                    : isDark
+                      ? 'text-slate-500 group-hover:text-slate-300'
+                      : 'text-slate-400 group-hover:text-slate-700'
+                }`}
+              />
+              <span className="flex-1">{label}</span>
+              <kbd
+                className={`hidden font-mono text-[9px] group-hover:inline-block ${
+                  isDark ? 'text-slate-600' : 'text-slate-400'
+                }`}
+              >
+                ⌥{idx + 1}
+              </kbd>
             </>
           )}
         </NavLink>
@@ -156,6 +177,24 @@ export default function Layout() {
   const [showStatusModal, setShowStatusModal] = useState(false)
   const { pathname } = useLocation()
   const health = useBackendHealth()
+  const { toggleTheme, isDark } = useTheme()
+
+  // Global Alt+1..7 quick navigation
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.altKey && e.key >= '1' && e.key <= '7') {
+        const idx = parseInt(e.key, 10) - 1
+        if (NAV_ITEMS[idx]) {
+          e.preventDefault()
+          window.location.hash = ''
+          window.history.pushState(null, '', NAV_ITEMS[idx].to)
+          window.dispatchEvent(new PopStateEvent('popstate'))
+        }
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   useEffect(() => {
     setOpen(false)
@@ -163,33 +202,34 @@ export default function Layout() {
   }, [pathname])
 
   return (
-    <div className="flex min-h-screen bg-ink-950 text-slate-200">
+    <div className={`flex min-h-screen transition-colors duration-200 ${isDark ? 'bg-ink-950 text-slate-200' : 'bg-slate-50 text-slate-900'}`}>
       {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 shrink-0 flex-col border-r border-white/[0.07] bg-ink-900/80 px-4 py-6 backdrop-blur-2xl lg:flex">
+      <aside className={`fixed inset-y-0 left-0 z-30 hidden w-60 shrink-0 flex-col border-r px-3.5 py-5 backdrop-blur-2xl lg:flex transition-colors duration-200 ${isDark ? 'border-white/[0.07] bg-ink-900/90' : 'border-slate-200 bg-white/95 text-slate-800 shadow-sm'}`}>
         <Brand />
-        <div className="mt-8 flex-1">
-          <p className="label mb-2 px-3 text-[10px] uppercase tracking-wider text-slate-500">Navigation</p>
-          <NavItems />
+        
+        <div className="mt-6 flex-1 overflow-y-auto">
+          <NavList />
         </div>
 
-        {/* Live system health pill */}
-        <div className="mt-auto border-t border-white/[0.07] pt-4">
+        {/* Live system health footer button */}
+        <div className={`mt-auto border-t pt-3 ${isDark ? 'border-white/[0.07]' : 'border-slate-200'}`}>
           <button
             onClick={() => setShowStatusModal(true)}
-            className="flex w-full items-center justify-between rounded-xl border border-white/[0.06] bg-white/[0.02] p-2.5 text-left transition hover:border-white/15 hover:bg-white/[0.05]"
+            className={`flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left transition ${
+              isDark
+                ? 'border-white/[0.06] bg-white/[0.02] hover:border-white/15 hover:bg-white/[0.05]'
+                : 'border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-slate-300'
+            }`}
           >
             <div className="flex items-center gap-2">
               <span className={`h-2 w-2 rounded-full ${health.online ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
-              <div>
-                <p className="text-xs font-semibold text-slate-200">
-                  {usingMocks ? 'Demo Dataset' : health.online ? 'Live (Atlas)' : 'Connecting'}
-                </p>
-                <p className="text-[10px] text-slate-500">
-                  {health.ping ? `${health.ping}ms latency` : 'Cloud Services'}
-                </p>
-              </div>
+              <p className={`text-xs font-semibold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                {usingMocks ? 'Demo Data' : health.online ? 'Atlas Live' : 'Connecting'}
+              </p>
             </div>
-            <Activity size={14} className="text-slate-500" />
+            <span className={`text-[10px] font-mono ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+              {health.ping ? `${health.ping}ms` : ''}
+            </span>
           </button>
         </div>
       </aside>
@@ -198,55 +238,66 @@ export default function Layout() {
       {open && (
         <div className="fixed inset-0 z-40 lg:hidden">
           <button className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={() => setOpen(false)} aria-label="Close menu" />
-          <aside className="absolute inset-y-0 left-0 flex w-72 animate-fade-up flex-col border-r border-white/10 bg-ink-900 px-4 py-6 shadow-2xl">
+          <aside className={`absolute inset-y-0 left-0 flex w-64 animate-fade-up flex-col border-r px-4 py-5 shadow-2xl transition-colors duration-200 ${isDark ? 'border-white/10 bg-ink-900' : 'border-slate-200 bg-white text-slate-800'}`}>
             <div className="flex items-center justify-between">
               <Brand />
               <button onClick={() => setOpen(false)} className="rounded-lg p-2 text-slate-400 hover:bg-white/10" aria-label="Close menu">
                 <X size={18} />
               </button>
             </div>
-            <div className="mt-8">
-              <p className="label mb-2 px-3 text-[10px] uppercase tracking-wider text-slate-500">Navigation</p>
-              <NavItems onNavigate={() => setOpen(false)} />
+            <div className="mt-6 flex-1 overflow-y-auto">
+              <NavList onNavigate={() => setOpen(false)} />
             </div>
           </aside>
         </div>
       )}
 
-      <div className="flex min-w-0 flex-1 flex-col lg:pl-64">
-        <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-white/[0.07] bg-ink-950/85 px-4 py-3 backdrop-blur-xl sm:px-6">
-          <button
-            onClick={() => setOpen(true)}
-            className="rounded-lg border border-white/10 p-2 text-slate-300 transition hover:bg-white/10 lg:hidden"
-            aria-label="Open menu"
-          >
-            <Menu size={18} />
-          </button>
-          <div className="lg:hidden">
-            <Brand />
+      <div className="flex min-w-0 flex-1 flex-col lg:pl-60">
+        {/* Sleek, Clean Top Header */}
+        <header className={`sticky top-0 z-20 flex items-center justify-between gap-4 border-b px-4 py-2.5 backdrop-blur-xl sm:px-6 transition-colors duration-200 ${isDark ? 'border-white/[0.07] bg-ink-950/80' : 'border-slate-200 bg-white/90 shadow-sm'}`}>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setOpen(true)}
+              className={`rounded-lg border p-1.5 transition lg:hidden ${isDark ? 'border-white/10 text-slate-300 hover:bg-white/10' : 'border-slate-200 text-slate-700 hover:bg-slate-100'}`}
+              aria-label="Open menu"
+            >
+              <Menu size={18} />
+            </button>
+            
+            <div className="lg:hidden">
+              <Brand />
+            </div>
+
+            {/* Clean Desktop Search Bar */}
+            <button
+              onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))}
+              className={`hidden sm:flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs transition ${
+                isDark
+                  ? 'border-white/10 bg-white/[0.03] text-slate-400 hover:border-white/20 hover:text-slate-200'
+                  : 'border-slate-200 bg-slate-50 text-slate-500 hover:border-slate-300 hover:text-slate-900'
+              }`}
+            >
+              <Search size={13} />
+              <span className="pr-6">Search markets, commands…</span>
+              <kbd className="kbd text-[10px]">Ctrl K</kbd>
+            </button>
           </div>
 
-          <button
-            onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))}
-            className="ml-auto hidden items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs text-slate-400 transition hover:border-white/20 hover:text-slate-200 md:flex"
-          >
-            <Search size={14} />
-            <span className="pr-6">Search markets or commands…</span>
-            <kbd className="kbd">Ctrl K</kbd>
-          </button>
-
-          <div className="ml-auto flex items-center gap-2 md:ml-3 sm:gap-3">
+          {/* Clean Right Actions */}
+          <div className="flex items-center gap-2 sm:gap-2.5">
             <button
-              onClick={() => setShowStatusModal(true)}
-              className="cursor-pointer"
-              title="System Connectivity Status"
+              onClick={toggleTheme}
+              className={`flex h-8 w-8 items-center justify-center rounded-xl border transition ${
+                isDark
+                  ? 'border-white/10 bg-white/[0.03] text-slate-300 hover:border-white/20 hover:text-white'
+                  : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300 hover:bg-slate-100'
+              }`}
+              title={`Switch to ${isDark ? 'Light' : 'Dark'} Mode`}
+              aria-label="Toggle Theme"
             >
-              <StatusBadge
-                status={health.online ? 'online' : 'connecting'}
-                text={health.online ? 'Atlas Connected' : 'Reconnecting'}
-                ping={health.ping}
-              />
+              {isDark ? <Sun size={15} className="text-amber-400" /> : <Moon size={15} className="text-brand-600" />}
             </button>
+
             <DemoLaunchButton />
             <UserMenu />
           </div>
@@ -256,10 +307,10 @@ export default function Layout() {
           <Outlet />
         </main>
 
-        <footer className="border-t border-white/[0.07] px-4 py-5 text-center text-xs text-slate-500 sm:px-6">
+        <footer className={`border-t px-4 py-4 text-center text-xs sm:px-6 transition-colors duration-200 ${isDark ? 'border-white/[0.07] text-slate-500' : 'border-slate-200 bg-white/70 text-slate-500'}`}>
           <div className="flex flex-col items-center justify-between gap-2 sm:flex-row max-w-[1440px] mx-auto">
             <span>Venture DAO · Institutional Autonomous Trading Intelligence</span>
-            <span className="font-mono text-[11px] text-slate-600">TLS 1.3 · HMAC AES-256 · Node 22</span>
+            <span className={`font-mono text-[11px] ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>TLS 1.3 · HMAC AES-256 · Node 22</span>
           </div>
         </footer>
       </div>

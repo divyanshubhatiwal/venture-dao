@@ -628,10 +628,20 @@ export default function Trading() {
                   ))}
                 </select>
                 <select value={ticket.type} onChange={(e) => setTicket((t) => ({ ...t, type: e.target.value }))} className="input py-2">
-                  <option value="market">Market</option>
-                  <option value="limit">Limit</option>
+                  <option value="market">Market (Immediate)</option>
+                  <option value="limit">Limit (Maker)</option>
+                  <option value="twap">TWAP Algo (15m Time Slice)</option>
+                  <option value="vwap">VWAP Algo (Volume Curve)</option>
+                  <option value="iceberg">Iceberg (Stealth Fill)</option>
                 </select>
               </div>
+
+              {/* Execution Strategy Badge */}
+              {ticket.type !== 'market' && ticket.type !== 'limit' && (
+                <div className="rounded-lg border border-brand-500/30 bg-brand-500/10 p-2 text-[11px] text-brand-200">
+                  <span className="font-semibold">⚡ Hedge Fund Execution:</span> Slices order into sub-fills to eliminate slippage and public book footprint.
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-2">
                 {['buy', 'sell'].map((side) => (
@@ -642,8 +652,8 @@ export default function Trading() {
                     className={`btn border text-xs ${
                       ticket.side === side
                         ? side === 'buy'
-                          ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300'
-                          : 'border-rose-500/50 bg-rose-500/15 text-rose-300'
+                          ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300 shadow-md'
+                          : 'border-rose-500/50 bg-rose-500/15 text-rose-300 shadow-md'
                         : 'border-white/10 bg-white/[0.04] text-slate-400 hover:border-white/25'
                     }`}
                   >
@@ -680,7 +690,7 @@ export default function Trading() {
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="label">Stop</label>
+                  <label className="label">Stop Loss</label>
                   <input
                     type="number"
                     step="any"
@@ -690,7 +700,7 @@ export default function Trading() {
                   />
                 </div>
                 <div>
-                  <label className="label">Target</label>
+                  <label className="label">Take Profit</label>
                   <input
                     type="number"
                     step="any"
@@ -708,7 +718,7 @@ export default function Trading() {
 
               <button type="submit" disabled={submitting || !ticketPrice} className="btn-primary w-full">
                 {submitting ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
-                Submit to practice account
+                Execute {ticket.type.toUpperCase()} Order
               </button>
             </form>
           </Card>
