@@ -58,9 +58,9 @@ export default function Macro() {
   return (
     <div className="animate-fade-up">
       <PageHeader
-        eyebrow="Market background"
-        title="Market background"
-        subtitle="The things a price chart hides: how jumpy markets are, the dollar, interest rates, and how much borrowed money is in play. Every decision is made against this backdrop."
+        eyebrow="Market Intelligence"
+        title="News & Macro Sentiment"
+        subtitle="Global market context: volatility regimes, macroeconomic news, bond yields, and institutional liquidity indicators."
         actions={
           <>
             <LiveBadge live={!loading && Boolean(data)} label={loading ? 'loading' : 'live'} />
@@ -243,7 +243,7 @@ export default function Macro() {
                       </linearGradient>
                     </defs>
                     <Tooltip content={<ChartTooltip formatter={(v) => usd(v, { compact: true })} />} />
-                    <Area type="monotone" dataKey="oi" name="Open interest" stroke="#a855f7" strokeWidth={2} fill="url(#oiFill)" />
+                    <Area type="linear" dataKey="oi" name="Open interest" stroke="#a855f7" strokeWidth={2} fill="url(#oiFill)" />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -304,7 +304,7 @@ export default function Macro() {
                     </defs>
                     <YAxis domain={[0, 100]} tickLine={false} axisLine={false} width={38} />
                     <Tooltip content={<ChartTooltip />} />
-                    <Area type="monotone" dataKey="value" name="Index" stroke="#818cf8" strokeWidth={2} fill="url(#fngFill)" />
+                    <Area type="linear" dataKey="value" name="Index" stroke="#818cf8" strokeWidth={2} fill="url(#fngFill)" />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>

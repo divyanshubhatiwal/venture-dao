@@ -14,6 +14,8 @@ export { default as ErrorBoundary } from './ErrorBoundary.jsx'
 export { default as ProtectedRoute } from './ProtectedRoute.jsx'
 export { default as CommandPalette } from './CommandPalette.jsx'
 export { default as DemoOverlay } from './DemoOverlay.jsx'
+export { default as TiltCard } from './TiltCard.jsx'
+export { default as LiveTradingBackground } from './LiveTradingBackground.jsx'
 
 // Layout
 export { default as Layout } from './Layout.jsx'

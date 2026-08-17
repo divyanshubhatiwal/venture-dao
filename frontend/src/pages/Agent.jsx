@@ -117,6 +117,7 @@ export default function Agent() {
   const [regime, setRegime] = useState(null)
   const [floor, setFloor] = useState(null)
   const [peak, setPeak] = useState(null)
+  const [agentTab, setAgentTab] = useState('controls')
 
   const runningRef = useRef(running)
   runningRef.current = running
@@ -355,8 +356,37 @@ export default function Agent() {
         </p>
       </div>
 
+      {/* Sub-Tabs */}
+      <div className="mt-5 flex flex-wrap items-center gap-2 border-b border-white/[0.08] pb-3">
+        {[
+          { id: 'controls', label: 'Autopilot Controls & Goal', icon: Bot },
+          { id: 'simulation', label: 'Monte Carlo Goal Simulation', icon: Gauge, badge: mc?.probabilityOfTarget != null ? `${mc.probabilityOfTarget}% win` : null },
+          { id: 'logs', label: 'Decision Logs & Audit', icon: ServerCog, badge: decisions.length },
+        ].map(({ id, label, icon: Icon, badge }) => (
+          <button
+            key={id}
+            onClick={() => setAgentTab(id)}
+            className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition ${
+              agentTab === id
+                ? 'bg-gradient-to-r from-brand-600 to-accent text-white shadow-md'
+                : 'border border-white/10 bg-white/[0.03] text-slate-400 hover:border-white/20 hover:text-white'
+            }`}
+          >
+            <Icon size={14} />
+            <span>{label}</span>
+            {badge != null && (
+              <span className="rounded-full bg-white/20 px-1.5 py-0.2 font-mono text-[10px] text-white">
+                {badge}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {agentTab === 'controls' && (
+      <>
       {/* Goal + state */}
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
         <Card className="p-5 xl:col-span-2" data-demo="goal">
           <SectionTitle icon={Target} title="Progress to your goal" hint="Balance, peak and the protected floor on one scale" />
           <GoalBar goalState={goalState} />
@@ -625,8 +655,11 @@ export default function Agent() {
           </Card>
         </div>
       </div>
+      </>
+      )}
 
-      {/* Monte Carlo */}
+      {/* Monte Carlo Simulation */}
+      {agentTab === 'simulation' && (
       <Card className="mt-4 p-5">
         <SectionTitle
           icon={Gauge}
@@ -676,7 +709,7 @@ export default function Agent() {
                   <XAxis dataKey="label" tickLine={false} axisLine={false} minTickGap={20} />
                   <YAxis tickLine={false} axisLine={false} width={44} />
                   <Tooltip content={<ChartTooltip />} />
-                  <Area type="monotone" dataKey="count" name="Runs" stroke="#a855f7" strokeWidth={2} fill="url(#mcFill)" />
+                  <Area type="linear" dataKey="count" name="Runs" stroke="#a855f7" strokeWidth={2} fill="url(#mcFill)" />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -709,8 +742,11 @@ export default function Agent() {
           </>
         )}
       </Card>
+      )}
 
       {/* Equity + journal */}
+      {agentTab === 'logs' && (
+      <>
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
         <Card className="p-5">
           <SectionTitle icon={Gauge} title="Account value over time" hint="Rebased to the goal scale" />
@@ -727,7 +763,7 @@ export default function Agent() {
                   <XAxis dataKey="label" tickLine={false} axisLine={false} minTickGap={24} />
                   <YAxis domain={['auto', 'auto']} tickLine={false} axisLine={false} width={52} />
                   <Tooltip content={<ChartTooltip formatter={(v) => money(v)} />} />
-                  <Area type="monotone" dataKey="balance" name="Balance" stroke="#34d399" strokeWidth={2} fill="url(#agentFill)" />
+                  <Area type="linear" dataKey="balance" name="Balance" stroke="#34d399" strokeWidth={2} fill="url(#agentFill)" />
                 </AreaChart>
               </ResponsiveContainer>
             ) : (
@@ -771,6 +807,8 @@ export default function Agent() {
             {formatDecision(latest)}
           </pre>
         </Card>
+      )}
+      </>
       )}
     </div>
   )

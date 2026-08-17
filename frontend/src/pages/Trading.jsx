@@ -85,83 +85,94 @@ function SignalCard({ signal, name, onTrade, busy, tuned }) {
   const flat = signal.direction === 'flat'
 
   return (
-    <div className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-sm font-bold text-slate-100">{signal.symbol}</span>
-            <span className="truncate text-xs text-slate-500">{name}</span>
+    <div className="flex h-full flex-col justify-between rounded-xl border border-white/[0.08] bg-white/[0.02] p-4 transition hover:border-white/20">
+      <div>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-sm font-bold text-slate-100">{signal.symbol}</span>
+              <span className="truncate text-xs text-slate-500">{name}</span>
+            </div>
+            <p className="mt-1 font-mono text-lg font-bold text-white">{money(signal.price, signal.price >= 100 ? 2 : 4)}</p>
           </div>
-          <p className="mt-1 font-mono text-lg font-bold text-white">{money(signal.price, signal.price >= 100 ? 2 : 4)}</p>
-        </div>
-        <div className="text-right">
-          <Chip tone={toneClass[signal.tone]}>{signal.bias}</Chip>
-          <p className="mt-1.5 text-[10px] text-slate-500">
-            {tuned?.adjustment ? (
-              <>
-                <span className="line-through opacity-60">{signal.confidence}%</span>{' '}
-                <span className={tuned.adjustment > 0 ? 'text-emerald-400' : 'text-amber-400'}>{tuned.confidence}%</span> agreement
-              </>
-            ) : (
-              `${signal.confidence}% agreement`
-            )}
-          </p>
-          {tuned?.adjustment ? (
-            <p className="mt-0.5 text-[9px] text-slate-600">
-              {tuned.adjustment > 0 ? '+' : ''}
-              {tuned.adjustment} from episode record
+          <div className="text-right">
+            <Chip tone={toneClass[signal.tone]}>{signal.bias}</Chip>
+            <p className="mt-1.5 text-[10px] text-slate-500">
+              {tuned?.adjustment ? (
+                <>
+                  <span className="line-through opacity-60">{signal.confidence}%</span>{' '}
+                  <span className={tuned.adjustment > 0 ? 'text-emerald-400' : 'text-amber-400'}>{tuned.confidence}%</span> agreement
+                </>
+              ) : (
+                `${signal.confidence}% agreement`
+              )}
             </p>
-          ) : null}
+          </div>
         </div>
-      </div>
 
-      {!flat && (
+        {/* Level matrix or Neutral indicator metrics */}
         <div className="mt-3 grid grid-cols-3 gap-2 rounded-lg border border-white/[0.06] bg-black/20 p-2.5 text-center">
           {[
-            ['Entry', signal.levels.entry, 'text-slate-200'],
-            ['Stop', signal.levels.stop, 'text-rose-300'],
-            ['Target', signal.levels.target, 'text-emerald-300'],
+            ['Entry', signal.levels?.entry ?? signal.price, 'text-slate-200'],
+            ['Stop', signal.levels?.stop ?? (signal.price ? signal.price * 0.98 : null), 'text-rose-300'],
+            ['Target', signal.levels?.target ?? (signal.price ? signal.price * 1.04 : null), 'text-emerald-300'],
           ].map(([label, value, tone]) => (
             <div key={label}>
               <p className="text-[9px] uppercase tracking-wider text-slate-500">{label}</p>
-              <p className={`mt-0.5 font-mono text-xs font-semibold ${tone}`}>{money(value, value >= 100 ? 2 : 4)}</p>
+              <p className={`mt-0.5 font-mono text-xs font-semibold ${tone}`}>{value ? money(value, value >= 100 ? 2 : 4) : '—'}</p>
             </div>
           ))}
         </div>
-      )}
 
-      <p className="mt-3 text-[11px] leading-relaxed text-slate-400">{explainSignal(signal)}</p>
+        <p className="mt-3 text-[11px] leading-relaxed text-slate-400 line-clamp-2">{explainSignal(signal)}</p>
+
+        <button
+          onClick={() => setOpen((o) => !o)}
+          className="mt-2 text-[11px] font-semibold text-brand-300 transition hover:text-brand-200"
+        >
+          {open ? 'Hide' : 'Show'} the {signal.checks.length} checks
+        </button>
+
+        {open && (
+          <ul className="mt-2 space-y-1.5 border-t border-white/[0.06] pt-2">
+            {signal.checks.map((c) => (
+              <li key={c.name} className="flex items-center gap-2 text-[11px]">
+                <span
+                  className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                    c.verdict === 'bullish' ? 'bg-emerald-400' : c.verdict === 'bearish' ? 'bg-rose-400' : 'bg-slate-600'
+                  }`}
+                />
+                <span className="text-slate-300">{c.name}</span>
+                <span className="text-slate-500">{c.detail}</span>
+                {c.weight > 0 && <span className="ml-auto font-mono text-slate-600">w{c.weight}</span>}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
 
       <button
-        onClick={() => setOpen((o) => !o)}
-        className="mt-2.5 text-[11px] font-semibold text-brand-300 transition hover:text-brand-200"
+        onClick={() => onTrade(signal)}
+        disabled={busy}
+        className={`btn-sm mt-3.5 flex w-full items-center justify-center gap-1.5 rounded-lg border font-semibold text-xs transition ${
+          flat
+            ? 'border-white/10 bg-white/[0.04] text-slate-300 hover:bg-white/[0.08]'
+            : long
+              ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25'
+              : 'border-rose-500/40 bg-rose-500/15 text-rose-300 hover:bg-rose-500/25'
+        }`}
       >
-        {open ? 'Hide' : 'Show'} the {signal.checks.length} checks
+        {busy ? (
+          <Loader2 size={13} className="animate-spin" />
+        ) : long ? (
+          <TrendingUp size={13} />
+        ) : flat ? (
+          <Activity size={13} />
+        ) : (
+          <TrendingDown size={13} />
+        )}
+        {flat ? `Trade ${signal.symbol}` : `Load ${long ? 'Long' : 'Short'} Ticket`}
       </button>
-
-      {open && (
-        <ul className="mt-2 space-y-1.5">
-          {signal.checks.map((c) => (
-            <li key={c.name} className="flex items-center gap-2 text-[11px]">
-              <span
-                className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                  c.verdict === 'bullish' ? 'bg-emerald-400' : c.verdict === 'bearish' ? 'bg-rose-400' : 'bg-slate-600'
-                }`}
-              />
-              <span className="text-slate-300">{c.name}</span>
-              <span className="text-slate-500">{c.detail}</span>
-              {c.weight > 0 && <span className="ml-auto font-mono text-slate-600">w{c.weight}</span>}
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {!flat && (
-        <button onClick={() => onTrade(signal)} disabled={busy} className="btn-ghost btn-sm mt-3 w-full">
-          {busy ? <Loader2 size={13} className="animate-spin" /> : long ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
-          Load {long ? 'long' : 'short'} into ticket
-        </button>
-      )}
     </div>
   )
 }
@@ -456,6 +467,7 @@ export default function Trading() {
   const ticketPrice = trading.priceOf(ticket.symbol)
   const workingOrders = trading.orders.filter((o) => o.status === 'working')
   const edgeCount = UNIVERSE.filter((a) => tests[a.symbol]?.ok && tests[a.symbol].verdict?.pass).length
+  const [tradingTab, setTradingTab] = useState('terminal')
 
   return (
     <div className="animate-fade-up">
@@ -520,59 +532,83 @@ export default function Trading() {
         ))}
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
-        {/* Signals */}
-        <Card className="p-5 xl:col-span-2" data-demo="signals">
-          <SectionTitle
-            icon={Activity}
-            title="Signal scan"
-            hint="Hourly candles · RSI, MACD, EMA/SMA trend, Bollinger, volume"
-            action={
-              scanning ? (
-                <span className="flex items-center gap-1.5 text-[11px] text-slate-500">
-                  <Loader2 size={12} className="animate-spin" /> scanning
-                </span>
-              ) : (
-                <button onClick={scan} className="btn-ghost btn-sm">
-                  Rescan
-                </button>
-              )
-            }
-          />
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {UNIVERSE.map((asset) => {
-              const signal = signals[asset.symbol]
-              if (!signal) return <div key={asset.symbol} className="skeleton h-52" />
-              if (!signal.ok) {
-                return (
-                  <div key={asset.symbol} className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-4">
-                    <p className="font-mono text-sm font-bold text-slate-100">{asset.symbol}</p>
-                    <p className="mt-2 text-[11px] text-slate-500">{signal.reason}</p>
-                  </div>
+      {/* Trading Sub-Tabs */}
+      <div className="mt-5 flex flex-wrap items-center gap-2 border-b border-white/[0.08] pb-3">
+        {[
+          { id: 'terminal', label: 'Signals & Order Ticket', icon: Activity },
+          { id: 'positions', label: 'Open Positions & History', icon: Gauge, badge: trading.positions.length },
+          { id: 'backtest', label: 'Strategy Backtest', icon: TrendingUp, badge: `${edgeCount}/${UNIVERSE.length}` },
+          { id: 'journal', label: 'AI Decision Journal', icon: History, badge: episodes.length },
+        ].map(({ id, label, icon: Icon, badge }) => (
+          <button
+            key={id}
+            onClick={() => setTradingTab(id)}
+            className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition ${
+              tradingTab === id
+                ? 'bg-gradient-to-r from-brand-600 to-accent text-white shadow-md'
+                : 'border border-white/10 bg-white/[0.03] text-slate-400 hover:border-white/20 hover:text-white'
+            }`}
+          >
+            <Icon size={14} />
+            <span>{label}</span>
+            {badge != null && badge !== 0 && (
+              <span className="rounded-full bg-white/20 px-1.5 py-0.2 font-mono text-[10px] text-white">
+                {badge}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {tradingTab === 'terminal' && (
+        <div className="mt-4 space-y-4">
+          {/* Top Section: Signal scan across full width */}
+          <Card className="p-5" data-demo="signals">
+            <SectionTitle
+              icon={Activity}
+              title="Signal scan"
+              hint="Hourly candles · RSI, MACD, EMA/SMA trend, Bollinger, volume"
+              action={
+                scanning ? (
+                  <span className="flex items-center gap-1.5 text-[11px] text-slate-500">
+                    <Loader2 size={12} className="animate-spin" /> scanning
+                  </span>
+                ) : (
+                  <button onClick={scan} className="btn-ghost btn-sm">
+                    Rescan
+                  </button>
                 )
               }
-              return (
-                <SignalCard
-                  key={asset.symbol}
-                  signal={signal}
-                  name={asset.name}
-                  onTrade={loadTicket}
-                  busy={submitting}
-                  tuned={adjustConfidence(signal, aggregates)}
-                />
-              )
-            })}
-          </div>
-        </Card>
+            />
+            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+              {UNIVERSE.map((asset) => {
+                const signal = signals[asset.symbol]
+                if (!signal) return <div key={asset.symbol} className="skeleton h-52" />
+                if (!signal.ok) {
+                  return (
+                    <div key={asset.symbol} className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-4">
+                      <p className="font-mono text-sm font-bold text-slate-100">{asset.symbol}</p>
+                      <p className="mt-2 text-[11px] text-slate-500">{signal.reason}</p>
+                    </div>
+                  )
+                }
+                return (
+                  <SignalCard
+                    key={asset.symbol}
+                    signal={signal}
+                    name={asset.name}
+                    onTrade={loadTicket}
+                    busy={submitting}
+                    tuned={adjustConfidence(signal, aggregates)}
+                  />
+                )
+              })}
+            </div>
+          </Card>
 
-        {/* News sits under the scan, in the same column, so headlines read as
-            context for the signals above rather than as another signal. */}
-        <div className="xl:col-span-2 xl:row-start-2">
-          <MarketNews />
-        </div>
-
-        {/* Ticket + agent */}
-        <div className="space-y-4">
+          {/* Bottom Section: Order Ticket + Autopilot on Left, Market News on Right */}
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+            <div className="space-y-4 lg:col-span-5">
           <Card className="p-5">
             <SectionTitle icon={Target} title="Order ticket" hint="Practice account" />
             <form onSubmit={submit} className="space-y-3">
@@ -677,19 +713,25 @@ export default function Trading() {
             </form>
           </Card>
 
-          {/* Agent */}
+          {/* Quick Autopilot Control */}
           <Card className="p-5">
-            <SectionTitle icon={Bot} title="Automatic trading" hint="Executes signals into the practice account" />
+            <div className="flex items-center justify-between">
+              <SectionTitle icon={Bot} title="Autopilot Engine" hint="Auto-execute signals" />
+              <Chip tone={agent.enabled ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300' : 'border-white/15 bg-white/5 text-slate-400'}>
+                {agent.enabled ? 'Active' : 'Standby'}
+              </Chip>
+            </div>
+            
             <button
               onClick={() => setAgent((a) => ({ ...a, enabled: !a.enabled }))}
-              className={`btn w-full border ${
+              className={`btn mt-3.5 w-full border text-xs font-semibold ${
                 agent.enabled
-                  ? 'border-rose-500/40 bg-rose-500/10 text-rose-300'
-                  : 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
+                  ? 'border-rose-500/40 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20'
+                  : 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20'
               }`}
             >
               {agent.enabled ? <Square size={14} /> : <Play size={14} />}
-              {agent.enabled ? 'Stop agent' : 'Start agent'}
+              {agent.enabled ? 'Stop Autopilot' : 'Start Autopilot'}
             </button>
 
             {halt && (
@@ -698,79 +740,30 @@ export default function Trading() {
               </p>
             )}
 
-            <label className="mt-4 flex cursor-pointer items-start gap-2.5 rounded-lg border border-white/[0.07] bg-white/[0.02] p-3">
-              <input
-                type="checkbox"
-                checked={agent.requireEdge}
-                onChange={(e) => setAgent((a) => ({ ...a, requireEdge: e.target.checked }))}
-                className="mt-0.5 accent-indigo-500"
-              />
-              <span>
-                <span className="text-xs font-semibold text-slate-200">Only trade backtested edge</span>
-                <span className="mt-0.5 block text-[11px] leading-relaxed text-slate-500">
-                  Skips any symbol whose backtest fails — negative expectancy, too few trades, or beaten by buy and hold.
-                  {edgeCount === 0 && ' Right now that is every symbol, so the agent will sit out.'}
-                </span>
-              </span>
-            </label>
-
-            <div className="mt-4 space-y-3.5">
-              {[
-                ['Minimum agreement', 'minConfidence', 50, 85, 5, '%'],
-                ['Risk per trade', 'riskPct', 0.5, 3, 0.5, '%'],
-                ['Max open positions', 'maxPositions', 1, 5, 1, ''],
-                ['Daily loss limit', 'dailyLossLimitPct', 1, 10, 1, '%'],
-              ].map(([label, key, min, max, step, unit]) => (
-                <div key={key}>
-                  <div className="flex items-center justify-between text-[11px]">
-                    <span className="text-slate-400">{label}</span>
-                    <span className="font-mono text-slate-200">
-                      {agent[key]}
-                      {unit}
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min={min}
-                    max={max}
-                    step={step}
-                    value={agent[key]}
-                    onChange={(e) => setAgent((a) => ({ ...a, [key]: +e.target.value }))}
-                    className="mt-1.5 w-full accent-indigo-500"
-                  />
-                </div>
-              ))}
+            <div className="mt-4 flex items-center justify-between border-t border-white/[0.06] pt-3 text-[11px] text-slate-400">
+              <span>Risk Budget: <span className="font-mono text-slate-200">{agent.riskPct}%</span></span>
+              <span>Min Agreement: <span className="font-mono text-slate-200">{agent.minConfidence}%</span></span>
             </div>
 
-            <p className="mt-4 text-[11px] leading-relaxed text-slate-500">
-              Rescans every two minutes. Size comes from the risk budget divided by the distance to the stop, so a wider stop buys
-              a smaller position. Stops and targets are enforced by the engine on every price tick.
-            </p>
-          </Card>
-
-          {/* Venue status */}
-          <Card className="p-5">
-            <SectionTitle icon={Info} title="Venues" />
-            <ul className="space-y-2">
-              {VENUES.map((v) => (
-                <li key={v.id} className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-2.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-semibold text-slate-200">{v.name}</span>
-                    <Chip
-                      tone={v.implemented ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-white/15 bg-white/5 text-slate-500'}
-                    >
-                      {v.implemented ? 'Connected' : 'Not wired'}
-                    </Chip>
-                  </div>
-                  <p className="mt-1 text-[10px] leading-relaxed text-slate-500">{v.note}</p>
-                </li>
-              ))}
-            </ul>
+            <Link
+              to="/agent"
+              className="mt-3.5 flex items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] py-2 text-xs font-medium text-brand-300 transition hover:border-white/20 hover:text-brand-200"
+            >
+              Full Risk & Monte Carlo Settings →
+            </Link>
           </Card>
         </div>
+
+        {/* Right side of bottom section: Market News */}
+        <div className="lg:col-span-7">
+          <MarketNews />
+        </div>
       </div>
+    </div>
+    )}
 
       {/* Episodes — the decision cycle, reviewed */}
+      {tradingTab === 'journal' && (
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
         <Card className="overflow-hidden p-0 xl:col-span-2">
           <div className="p-5 pb-3">
@@ -925,8 +918,10 @@ export default function Trading() {
           )}
         </Card>
       </div>
+      )}
 
       {/* Backtest — does the strategy actually work? */}
+      {tradingTab === 'backtest' && (
       <Card className="mt-4 overflow-hidden p-0" data-demo="backtest">
         <div className="flex flex-col gap-3 p-5 pb-3 sm:flex-row sm:items-center sm:justify-between">
           <SectionTitle
@@ -1030,8 +1025,11 @@ export default function Trading() {
           </p>
         </div>
       </Card>
+      )}
 
       {/* Positions + equity */}
+      {tradingTab === 'positions' && (
+      <>
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
         <Card className="overflow-hidden p-0 xl:col-span-2">
           <div className="p-5 pb-3">
@@ -1145,7 +1143,7 @@ export default function Trading() {
                   <XAxis dataKey="label" tickLine={false} axisLine={false} minTickGap={24} />
                   <YAxis domain={['auto', 'auto']} tickLine={false} axisLine={false} width={58} />
                   <Tooltip content={<ChartTooltip formatter={(v) => money(v)} />} />
-                  <Area type="monotone" dataKey="equity" name="Equity" stroke="#818cf8" strokeWidth={2} fill="url(#eqFill)" />
+                  <Area type="linear" dataKey="equity" name="Equity" stroke="#818cf8" strokeWidth={2} fill="url(#eqFill)" />
                 </AreaChart>
               </ResponsiveContainer>
             ) : (
@@ -1218,6 +1216,8 @@ export default function Trading() {
             </table>
           </div>
         </Card>
+      )}
+      </>
       )}
     </div>
   )

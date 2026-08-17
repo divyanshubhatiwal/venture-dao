@@ -199,19 +199,19 @@ export default function Dashboard() {
         <div className="h-64 px-2 pb-4 sm:px-4">
           {overview ? (
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={series} margin={{ top: 5, right: 8, left: -18, bottom: 0 }}>
+              <AreaChart data={series} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
                 <defs>
                   <linearGradient id="treasuryFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#6366f1" stopOpacity={0.35} />
-                    <stop offset="100%" stopColor="#6366f1" stopOpacity={0} />
+                    <stop offset="0%" stopColor="#818cf8" stopOpacity={0.25} />
+                    <stop offset="100%" stopColor="#818cf8" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.05)" vertical={false} />
-                <XAxis dataKey="month" tickLine={false} axisLine={false} />
-                <YAxis tickLine={false} axisLine={false} width={48} />
-                <Tooltip content={<ChartTooltip suffix=" ETH" />} cursor={{ stroke: 'rgba(255,255,255,.15)' }} />
-                <Area type="monotone" dataKey="benchmark" name="Holding" stroke="#475569" strokeDasharray="4 4" fill="none" strokeWidth={1.5} />
-                <Area type="monotone" dataKey="treasury" name="Treasury" stroke="#818cf8" strokeWidth={2.5} fill="url(#treasuryFill)" />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
+                <XAxis dataKey="month" tickLine={false} axisLine={{ stroke: 'rgba(255,255,255,0.1)' }} tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                <YAxis tickLine={false} axisLine={false} width={48} tick={{ fill: '#94a3b8', fontSize: 11 }} domain={['auto', 'auto']} />
+                <Tooltip content={<ChartTooltip suffix=" ETH" />} cursor={{ stroke: 'rgba(129,140,248,0.3)', strokeWidth: 1.5, strokeDasharray: '4 4' }} />
+                <Area type="linear" dataKey="benchmark" name="Holding Benchmark" stroke="#64748b" strokeDasharray="4 4" fill="none" strokeWidth={1.5} dot={false} />
+                <Area type="linear" dataKey="treasury" name="Venture DAO Treasury" stroke="#818cf8" strokeWidth={2} fill="url(#treasuryFill)" dot={{ r: 3, fill: '#818cf8', stroke: '#1e1b4b', strokeWidth: 2 }} activeDot={{ r: 5, fill: '#34d399', stroke: '#0f172a', strokeWidth: 2 }} />
               </AreaChart>
             </ResponsiveContainer>
           ) : (
@@ -297,9 +297,8 @@ export default function Dashboard() {
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.05)" vertical={false} />
                 <XAxis dataKey="month" tickLine={false} axisLine={false} />
                 <YAxis domain={[40, 90]} tickLine={false} axisLine={false} width={44} />
-                <Tooltip content={<ChartTooltip suffix="%" />} />
-                <Line type="monotone" dataKey="baseline" name="Coin flip" stroke="#475569" strokeDasharray="4 4" dot={false} strokeWidth={1.5} />
-                <Line type="monotone" dataKey="accuracy" name="Bot" stroke="#34d399" strokeWidth={2.5} dot={false} />
+                <Line type="linear" dataKey="baseline" name="Baseline (50%)" stroke="#64748b" strokeDasharray="4 4" dot={false} strokeWidth={1.5} />
+                <Line type="linear" dataKey="accuracy" name="AI Model Accuracy" stroke="#34d399" strokeWidth={2} dot={{ r: 3, fill: '#34d399', stroke: '#064e3b', strokeWidth: 1.5 }} activeDot={{ r: 5, fill: '#34d399', stroke: '#ffffff', strokeWidth: 2 }} />
               </LineChart>
             </ResponsiveContainer>
           ) : (

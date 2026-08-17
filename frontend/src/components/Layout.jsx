@@ -29,10 +29,10 @@ const API_URL = import.meta.env?.VITE_API_URL || ''
 
 const NAV = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/markets', label: 'Markets', icon: CandlestickChart },
-  { to: '/macro', label: 'Market background', icon: Compass },
-  { to: '/trading', label: 'Trade', icon: Bot },
-  { to: '/agent', label: 'Trading bot', icon: Target },
+  { to: '/trading', label: 'Trade', icon: CandlestickChart },
+  { to: '/agent', label: 'AI Agent', icon: Bot },
+  { to: '/markets', label: 'Markets', icon: Activity },
+  { to: '/macro', label: 'News & Macro', icon: Compass },
 ]
 
 function Brand() {

@@ -237,3 +237,50 @@
 .recharts-default-tooltip {
   border-radius: 12px !important;
 }
+
+/* ── 3D Visual Transformations & Keyframes ── */
+.preserve-3d {
+  transform-style: preserve-3d;
+}
+.perspective-1000 {
+  perspective: 1000px;
+}
+
+.animate-spin-slow-3d {
+  animation: spin-3d 20s linear infinite;
+}
+
+.animate-spin-reverse-3d {
+  animation: spin-reverse-3d 15s linear infinite;
+}
+
+.animate-float-3d {
+  animation: float-3d 6s ease-in-out infinite;
+}
+
+@keyframes spin-3d {
+  0% {
+    transform: rotateX(68deg) rotateY(20deg) rotateZ(0deg);
+  }
+  100% {
+    transform: rotateX(68deg) rotateY(20deg) rotateZ(360deg);
+  }
+}
+
+@keyframes spin-reverse-3d {
+  0% {
+    transform: rotateX(-60deg) rotateY(35deg) rotateZ(360deg);
+  }
+  100% {
+    transform: rotateX(-60deg) rotateY(35deg) rotateZ(0deg);
+  }
+}
+
+@keyframes float-3d {
+  0%, 100% {
+    transform: translateY(0px) rotateY(0deg) translateZ(20px);
+  }
+  50% {
+    transform: translateY(-14px) rotateY(10deg) translateZ(35px);
+  }
+}
