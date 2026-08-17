@@ -24,9 +24,7 @@ import {
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import CommandPalette from './CommandPalette'
-import DemoOverlay, { DemoLaunchButton } from './DemoOverlay'
 import { Modal } from './ui'
-import { usingMocks } from '../lib/api/api'
 
 const API_URL = import.meta.env?.VITE_API_URL || ''
 
@@ -224,7 +222,7 @@ export default function Layout() {
             <div className="flex items-center gap-2">
               <span className={`h-2 w-2 rounded-full ${health.online ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
               <p className={`text-xs font-semibold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                {usingMocks ? 'Demo Data' : health.online ? 'Atlas Live' : 'Connecting'}
+                {health.online ? 'Atlas Live' : 'Connecting'}
               </p>
             </div>
             <span className={`text-[10px] font-mono ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
@@ -298,7 +296,6 @@ export default function Layout() {
               {isDark ? <Sun size={15} className="text-amber-400" /> : <Moon size={15} className="text-brand-600" />}
             </button>
 
-            <DemoLaunchButton />
             <UserMenu />
           </div>
         </header>
@@ -316,7 +313,6 @@ export default function Layout() {
       </div>
 
       <CommandPalette />
-      <DemoOverlay />
 
       {/* System Status Modal */}
       <Modal

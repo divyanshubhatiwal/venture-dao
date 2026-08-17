@@ -12,9 +12,7 @@ import { RANGES, WATCHLIST, getCandles } from '../lib/market/marketApi'
 import { INDICES, STOCKS, STOCK_RANGES, formatPrice, getIndexQuotes, getStockCandles, getStockQuotes } from '../lib/market/stockApi'
 import { INTERVAL_MS, mergeLiveCandle } from '../lib/market/liveCandles'
 import { detectCurrency, formatIn, getRate } from '../lib/market/fx'
-import { getUsdtPeg } from '../lib/market/peg'
 import { explainSignal, generateSignal, MIN_CANDLES } from '../lib/trading/signals'
-import { DAO_STATS } from '../lib/demo/mockData'
 import { num, usd } from '../lib/format'
 
 /**

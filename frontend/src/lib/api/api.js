@@ -15,8 +15,8 @@ import {
 } from '../demo/mockData.js'
 
 const BASE_URL = import.meta.env?.VITE_API_URL || ''
-/** Set VITE_USE_MOCKS=false once the Express backend is running. */
-const FORCE_MOCKS = (import.meta.env?.VITE_USE_MOCKS ?? 'true') !== 'false'
+/** Real Live API Mode by default. */
+const FORCE_MOCKS = false
 
 export const http = axios.create({
   baseURL: BASE_URL,
