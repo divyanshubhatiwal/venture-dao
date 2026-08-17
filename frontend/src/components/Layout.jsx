@@ -33,6 +33,7 @@ const API_URL = import.meta.env?.VITE_API_URL || ''
 const NAV_DROPDOWNS = [
   {
     title: 'Platform',
+    icon: Layers,
     hint: 'Core trading systems & automated agent',
     items: [
       {
@@ -59,6 +60,7 @@ const NAV_DROPDOWNS = [
   },
   {
     title: 'Quant Studio',
+    icon: Cpu,
     hint: 'Strategy backtesting & DAO treasury allocation',
     items: [
       {
@@ -78,6 +80,7 @@ const NAV_DROPDOWNS = [
   },
   {
     title: 'Intelligence',
+    icon: Activity,
     hint: 'Live exchange feeds & global market mood',
     items: [
       {
@@ -98,19 +101,19 @@ const NAV_DROPDOWNS = [
 
 function Brand() {
   return (
-    <Link to="/dashboard" className="group flex items-center gap-2.5">
-      <div className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 via-indigo-600 to-accent shadow-md shadow-brand-500/25 transition-transform duration-300 group-hover:scale-105">
+    <Link to="/dashboard" className="group flex items-center gap-3 shrink-0">
+      <div className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 via-indigo-600 to-accent shadow-md shadow-brand-500/30 transition-transform duration-300 group-hover:scale-105">
         <svg viewBox="0 0 64 64" className="h-4.5 w-4.5 text-white">
           <path d="M16 18l16 30 16-30" fill="none" stroke="currentColor" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
-        <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-400 border border-ink-950 animate-pulse" />
+        <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-400 border-2 border-ink-950 animate-pulse" />
       </div>
       <div>
         <div className="flex items-center gap-1.5">
-          <p className="font-display text-sm font-bold tracking-tight text-slate-900 dark:text-white">Venture DAO</p>
-          <span className="rounded bg-brand-500/15 border border-brand-500/30 px-1 py-0.2 text-[8px] font-mono font-bold text-brand-500 dark:text-brand-300">v2.4</span>
+          <p className="font-display text-sm font-extrabold tracking-tight text-white">Venture DAO</p>
+          <span className="rounded-md bg-brand-500/20 border border-brand-500/30 px-1.5 py-0.2 text-[8px] font-mono font-bold text-brand-300">v2.4</span>
         </div>
-        <p className="text-[9px] font-semibold tracking-wider text-brand-600 dark:text-brand-400 uppercase">Institutional Quant</p>
+        <p className="text-[9px] font-semibold tracking-wider text-brand-400 uppercase">Institutional Quant</p>
       </div>
     </Link>
   )
@@ -154,6 +157,7 @@ function NavDropdown({ group, activeSection, onNavigate }) {
   const dropdownRef = useRef(null)
   const timeoutRef = useRef(null)
   const { isDark } = useTheme()
+  const GroupIcon = group.icon
 
   const handleMouseEnter = () => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current)
@@ -187,30 +191,31 @@ function NavDropdown({ group, activeSection, onNavigate }) {
     >
       <button
         onClick={() => setIsOpen((prev) => !prev)}
-        className={`group flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition-all duration-150 ${
+        className={`group flex items-center gap-2 rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all duration-200 ${
           isCurrentActive
-            ? 'bg-brand-500/15 text-brand-600 dark:text-brand-300 border border-brand-500/30'
+            ? 'bg-gradient-to-r from-brand-600 to-indigo-600 text-white shadow-md shadow-brand-500/25'
             : isDark
-              ? 'text-slate-300 hover:bg-white/[0.06] hover:text-white'
+              ? 'text-slate-300 hover:bg-white/[0.08] hover:text-white'
               : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
         }`}
         aria-expanded={isOpen}
       >
+        <GroupIcon size={14} className={isCurrentActive ? 'text-white' : isDark ? 'text-slate-400 group-hover:text-brand-300' : 'text-slate-500 group-hover:text-brand-600'} />
         <span>{group.title}</span>
         <ChevronDown
-          size={13}
-          className={`transition-transform duration-200 ${isOpen ? 'rotate-180 text-brand-400' : 'text-slate-400'}`}
+          size={12}
+          className={`transition-transform duration-200 ${isOpen ? 'rotate-180 text-brand-300' : 'text-slate-400 opacity-70 group-hover:opacity-100'}`}
         />
       </button>
 
       {/* Floating Dropdown Box */}
       {isOpen && (
-        <div className={`absolute left-0 top-full mt-2 w-72 origin-top-left rounded-2xl border p-2 shadow-2xl backdrop-blur-2xl transition-all animate-fade-up z-50 ${
+        <div className={`absolute left-1/2 -translate-x-1/2 top-full mt-2.5 w-80 origin-top rounded-2xl border p-2 shadow-2xl backdrop-blur-3xl transition-all animate-fade-up z-50 ${
           isDark
             ? 'border-white/10 bg-ink-900/95 shadow-black/80'
-            : 'border-slate-200 bg-white/95 shadow-slate-300/60'
+            : 'border-slate-200 bg-white/95 shadow-slate-300/70'
         }`}>
-          <div className={`mb-1 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${
+          <div className={`mb-1.5 px-3 py-1 text-[10px] font-bold uppercase tracking-wider ${
             isDark ? 'text-slate-500' : 'text-slate-400'
           }`}>
             {group.hint}
@@ -239,9 +244,9 @@ function NavDropdown({ group, activeSection, onNavigate }) {
               >
                 {({ isActive }) => (
                   <>
-                    <div className={`mt-0.5 rounded-lg p-1.5 transition-colors ${
+                    <div className={`mt-0.5 rounded-lg p-2 transition-colors ${
                       isActive
-                        ? 'bg-brand-500 text-white'
+                        ? 'bg-brand-500 text-white shadow-sm'
                         : isDark
                           ? 'bg-white/[0.05] text-slate-400 group-hover:bg-brand-500/20 group-hover:text-brand-300'
                           : 'bg-slate-100 text-slate-600 group-hover:bg-brand-100 group-hover:text-brand-700'
@@ -252,7 +257,7 @@ function NavDropdown({ group, activeSection, onNavigate }) {
                       <div className="flex items-center gap-1.5">
                         <span className="text-xs font-bold">{label}</span>
                         {badge && (
-                          <span className="rounded bg-brand-500/20 px-1 py-0.2 text-[8px] font-mono font-bold uppercase text-brand-600 dark:text-brand-300 border border-brand-500/30">
+                          <span className="rounded bg-brand-500/20 px-1.5 py-0.2 text-[8px] font-mono font-bold uppercase text-brand-600 dark:text-brand-300 border border-brand-500/30">
                             {badge}
                           </span>
                         )}
@@ -293,7 +298,7 @@ function UserMenu() {
         <span className="grid h-6 w-6 place-items-center rounded-lg bg-gradient-to-br from-brand-600 to-accent text-[10px] font-bold text-white shadow-sm">
           {initials}
         </span>
-        <span className="hidden text-xs font-semibold text-slate-700 dark:text-slate-200 sm:inline max-w-[100px] truncate">
+        <span className="hidden text-xs font-semibold text-slate-200 sm:inline max-w-[100px] truncate">
           {user.name || 'Trader'}
         </span>
         <button
@@ -328,8 +333,8 @@ export default function Layout() {
         isDark ? 'border-white/[0.08] bg-ink-950/85' : 'border-slate-200 bg-white/90 shadow-sm'
       }`}>
         <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-4 px-4 py-2.5 sm:px-6">
-          {/* Left: Brand Emblem */}
-          <div className="flex items-center gap-6">
+          {/* Left: Brand Emblem & Mobile Menu Trigger */}
+          <div className="flex items-center gap-3">
             <button
               onClick={() => setMobileMenuOpen(true)}
               className={`rounded-lg border p-1.5 transition lg:hidden ${
@@ -341,21 +346,23 @@ export default function Layout() {
             </button>
 
             <Brand />
-
-            {/* Center: Desktop Horizontal Dropdown Boxes */}
-            <nav className="hidden lg:flex items-center gap-1.5 ml-2">
-              {NAV_DROPDOWNS.map((group) => (
-                <NavDropdown
-                  key={group.title}
-                  group={group}
-                  activeSection={pathname}
-                />
-              ))}
-            </nav>
           </div>
 
+          {/* Center: Sleek Segmented Pill Navigation Bar */}
+          <nav className={`hidden lg:flex items-center gap-1 rounded-2xl border p-1 backdrop-blur-xl ${
+            isDark ? 'border-white/[0.08] bg-white/[0.02]' : 'border-slate-200 bg-slate-100/80 shadow-sm'
+          }`}>
+            {NAV_DROPDOWNS.map((group) => (
+              <NavDropdown
+                key={group.title}
+                group={group}
+                activeSection={pathname}
+              />
+            ))}
+          </nav>
+
           {/* Right: Quick Action Controls */}
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-2 sm:gap-2.5">
             {/* Search Trigger */}
             <button
               onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))}
