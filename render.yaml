@@ -1,0 +1,74 @@
+# Render blueprint for the backend.
+#
+# WHY RENDER AND NOT A FREE TIER: Delta whitelists API keys by IP, so the
+# server needs a fixed outbound address. Render's free instances have dynamic
+# egress IPs and also sleep when idle — both fatal here. The first would break
+# every authenticated call the moment the IP rotated; the second would stop the
+# bot silently. `plan: starter` is the cheapest tier with static outbound IPs.
+#
+# Deploy: push this file, then in Render → New → Blueprint, point it at the repo.
+# Set every secret in the dashboard. None are in this file, and none should be.
+
+services:
+  - type: web
+    name: venture-dao-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    region: singapore # nearest to Delta India; move it if your account is global
+    healthCheckPath: /api/health
+    autoDeploy: false # a trading bot should not restart because a commit landed
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+
+      # The frontend's real origin. The session cookie needs credentials:true,
+      # which is incompatible with a wildcard origin — this must be exact.
+      - key: CORS_ORIGIN
+        sync: false
+
+      # --- secrets: set in the dashboard, never in this file ---------------
+      # sync:false means Render will not copy these between environments and
+      # will not store them in the blueprint.
+      - key: MONGODB_URI
+        sync: false
+      - key: MONGODB_DB
+        value: venture-dao
+
+      # Must be byte-identical to the key that encrypted any existing records.
+      # A different value makes every sealed PAN and API secret permanently
+      # unreadable — there is no recovery from that.
+      - key: DELTA_VAULT_KEY
+        sync: false
+
+      - key: DELTA_API_KEY
+        sync: false
+      - key: DELTA_API_SECRET
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+
+      # --- trading mode ----------------------------------------------------
+      # Left on testnet deliberately. Change these in the dashboard, yourself,
+      # once `npm run preflight` passes from this server. Both are required:
+      # DELTA_ENV=live alone silently falls back to testnet.
+      - key: DELTA_ENV
+        value: testnet
+      - key: DELTA_ALLOW_LIVE
+        value: 'false'
+
+      - key: DELTA_REGION
+        value: india
+
+      # Server-side ceiling on a single order, where the browser cannot reach
+      # it. Raise this deliberately; the default exists so an unconfigured
+      # deployment cannot place a large order.
+      - key: DELTA_MAX_ORDER_NOTIONAL
+        value: '100'
+
+      # Flip to 'true' and redeploy to block every order-placing route at once.
+      - key: DELTA_KILL_SWITCH
+        value: 'false'

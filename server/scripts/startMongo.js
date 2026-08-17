@@ -1,9 +1,23 @@
 import { spawn } from 'node:child_process'
 import { mkdirSync } from 'node:fs'
 import { resolve } from 'node:path'
-// Extension required: ESM does not resolve extensionless deep paths the way
-// CommonJS does.
-import { MongoBinary } from 'mongodb-memory-server-core/lib/util/MongoBinary.js'
+/* Imported lazily, and guarded.
+   This comes from mongodb-memory-server, a devDependency, so a production
+   image built with --omit=dev does not have it. A bare import would fail
+   there with a module-resolution error that says nothing about the real
+   problem: this script is local tooling, and in production you point
+   MONGODB_URI at a real server instead.
+
+   The extension is required — ESM does not resolve extensionless deep paths
+   the way CommonJS does. */
+let MongoBinary
+try {
+  ;({ MongoBinary } = await import('mongodb-memory-server-core/lib/util/MongoBinary.js'))
+} catch {
+  console.error('\n  This script needs mongodb-memory-server, a development dependency.')
+  console.error('  In production, set MONGODB_URI to a real MongoDB server instead.\n')
+  process.exit(1)
+}
 
 /**
  * Start a local MongoDB for development.

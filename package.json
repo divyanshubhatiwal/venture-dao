@@ -11,7 +11,9 @@
     "test:watch": "vitest",
     "server": "node server/index.js",
     "db": "node server/scripts/startMongo.js",
-    "db:migrate": "node server/scripts/migrateSqliteToMongo.js"
+    "db:migrate": "node server/scripts/migrateSqliteToMongo.js",
+    "preflight": "node server/scripts/preflightLive.js",
+    "db:rename": "node server/scripts/renameDatabase.js"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^6.0.5",
@@ -36,5 +38,5 @@
     "react-router-dom": "^7.18.2",
     "recharts": "^3.10.1"
   },
-  "description": "Venture DAO \u2014 React frontend in src/, Express + MongoDB backend in server/"
+  "description": "Venture DAO — React frontend in src/, Express + MongoDB backend in server/"
 }
