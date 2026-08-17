@@ -11,6 +11,7 @@ import {
   Database,
   Globe,
   LayoutDashboard,
+  Layers,
   LogOut,
   Menu,
   Moon,
@@ -280,8 +281,9 @@ function NavDropdown({ group, activeSection, onNavigate }) {
 }
 
 /** Clean Minimal User Menu */
-function UserMenu() {
+function UserMenu({ inline }) {
   const { user, signOut, initials } = useAuth()
+  const { isDark } = useTheme()
   if (!user) return null
 
   const handleSignOut = async () => {
@@ -292,18 +294,49 @@ function UserMenu() {
     }
   }
 
-  return (
-    <div className="flex items-center gap-2">
-      <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-2.5 py-1.5 backdrop-blur-md">
-        <span className="grid h-6 w-6 place-items-center rounded-lg bg-gradient-to-br from-brand-600 to-accent text-[10px] font-bold text-white shadow-sm">
+  if (inline) {
+    return (
+      <div className={`flex items-center gap-2 px-2.5 py-1.5 transition-colors duration-150 rounded-r-[10px] ${
+        isDark ? 'hover:bg-white/[0.05]' : 'hover:bg-slate-100'
+      }`}>
+        <span className="grid h-6 w-6 place-items-center rounded-lg bg-gradient-to-br from-brand-600 to-accent text-[10px] font-bold text-white shadow-sm shrink-0">
           {initials}
         </span>
-        <span className="hidden text-xs font-semibold text-slate-200 sm:inline max-w-[100px] truncate">
+        <span className={`hidden text-xs font-semibold sm:inline max-w-[80px] truncate ${
+          isDark ? 'text-slate-200' : 'text-slate-700'
+        }`}>
           {user.name || 'Trader'}
         </span>
         <button
           onClick={handleSignOut}
-          className="rounded p-1 text-slate-400 hover:text-rose-400 transition"
+          className={`rounded p-1 transition-colors duration-150 ${
+            isDark ? 'text-slate-500 hover:text-rose-400' : 'text-slate-400 hover:text-rose-500'
+          }`}
+          aria-label="Sign out"
+          title="Sign out"
+        >
+          <LogOut size={12} />
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <div className={`flex items-center gap-2 rounded-xl border px-2.5 py-1.5 backdrop-blur-md ${
+        isDark ? 'border-white/10 bg-white/[0.03]' : 'border-slate-200 bg-slate-50'
+      }`}>
+        <span className="grid h-6 w-6 place-items-center rounded-lg bg-gradient-to-br from-brand-600 to-accent text-[10px] font-bold text-white shadow-sm">
+          {initials}
+        </span>
+        <span className={`hidden text-xs font-semibold sm:inline max-w-[100px] truncate ${
+          isDark ? 'text-slate-200' : 'text-slate-700'
+        }`}>
+          {user.name || 'Trader'}
+        </span>
+        <button
+          onClick={handleSignOut}
+          className={`rounded p-1 transition ${isDark ? 'text-slate-400 hover:text-rose-400' : 'text-slate-400 hover:text-rose-500'}`}
           aria-label="Sign out"
           title="Sign out"
         >
@@ -361,55 +394,70 @@ export default function Layout() {
             ))}
           </nav>
 
-          {/* Right: Quick Action Controls */}
-          <div className="flex items-center gap-2 sm:gap-2.5">
-            {/* Search Trigger */}
+          {/* Right: Unified Action Blocks */}
+          <div className="flex items-center gap-2">
+            {/* Block 1: Search Trigger */}
             <button
               onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))}
-              className={`hidden sm:flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs transition ${
+              className={`hidden sm:flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs transition-all duration-200 ${
                 isDark
-                  ? 'border-white/10 bg-white/[0.03] text-slate-400 hover:border-white/20 hover:text-slate-200'
-                  : 'border-slate-200 bg-slate-100 text-slate-600 hover:border-slate-300 hover:text-slate-900'
+                  ? 'border-white/[0.08] bg-white/[0.02] text-slate-400 hover:border-white/15 hover:bg-white/[0.05] hover:text-slate-200'
+                  : 'border-slate-200 bg-slate-50 text-slate-500 hover:border-slate-300 hover:bg-slate-100 hover:text-slate-800'
               }`}
             >
               <Search size={13} />
-              <span className="pr-4">Search…</span>
-              <kbd className="kbd text-[10px]">Ctrl K</kbd>
+              <span className="pr-3">Search…</span>
+              <kbd className={`rounded-[5px] border px-1.5 py-0.5 text-[10px] font-mono font-medium ${
+                isDark ? 'border-white/10 bg-white/[0.04] text-slate-500' : 'border-slate-200 bg-white text-slate-400'
+              }`}>⌘K</kbd>
             </button>
 
-            {/* Live Atlas Status Pill */}
-            <button
-              onClick={() => setShowStatusModal(true)}
-              className={`flex items-center gap-2 rounded-xl border px-2.5 py-1.5 text-xs font-semibold transition ${
-                isDark
-                  ? 'border-white/10 bg-white/[0.03] text-slate-300 hover:border-white/20'
-                  : 'border-slate-200 bg-slate-100 text-slate-700 hover:border-slate-300'
-              }`}
-              title="System Architecture & Cloud Status"
-            >
-              <span className={`h-2 w-2 rounded-full ${health.online ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
-              <span className="hidden md:inline">{health.online ? 'Atlas Live' : 'Connecting'}</span>
-              <span className={`text-[10px] font-mono ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                {health.ping ? `${health.ping}ms` : ''}
-              </span>
-            </button>
+            {/* Block 2: Combined Status + Controls Block */}
+            <div className={`flex items-center rounded-xl border backdrop-blur-md transition-colors duration-200 ${
+              isDark
+                ? 'border-white/[0.08] bg-white/[0.02]'
+                : 'border-slate-200 bg-slate-50 shadow-sm'
+            }`}>
+              {/* Atlas Live Status */}
+              <button
+                onClick={() => setShowStatusModal(true)}
+                className={`flex items-center gap-2 px-3 py-1.5 text-xs font-semibold transition-colors duration-150 ${
+                  isDark
+                    ? 'text-slate-300 hover:bg-white/[0.05] hover:text-white'
+                    : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+                } rounded-l-[10px]`}
+                title="System Architecture & Cloud Status"
+              >
+                <span className={`h-2 w-2 rounded-full shrink-0 ${health.online ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.5)] animate-pulse' : 'bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.5)]'}`} />
+                <span className="hidden md:inline whitespace-nowrap">{health.online ? 'Atlas Live' : 'Connecting'}</span>
+                <span className={`text-[10px] font-mono ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                  {health.ping ? `${health.ping}ms` : ''}
+                </span>
+              </button>
 
-            {/* Theme Toggle (☀️/🌙) */}
-            <button
-              onClick={toggleTheme}
-              className={`flex h-8 w-8 items-center justify-center rounded-xl border transition ${
-                isDark
-                  ? 'border-white/10 bg-white/[0.03] text-slate-300 hover:border-white/20 hover:text-white'
-                  : 'border-slate-200 bg-slate-100 text-slate-700 hover:border-slate-300 hover:bg-slate-200'
-              }`}
-              title={`Switch to ${isDark ? 'Light' : 'Dark'} Mode`}
-              aria-label="Toggle Theme"
-            >
-              {isDark ? <Sun size={15} className="text-amber-400 transition-transform duration-300 hover:rotate-45" /> : <Moon size={15} className="text-brand-600 transition-transform duration-300 hover:-rotate-12" />}
-            </button>
+              {/* Divider */}
+              <div className={`h-5 w-px shrink-0 ${isDark ? 'bg-white/[0.08]' : 'bg-slate-200'}`} />
 
-            {/* User Profile Menu */}
-            <UserMenu />
+              {/* Theme Toggle */}
+              <button
+                onClick={toggleTheme}
+                className={`flex h-8 w-8 items-center justify-center transition-colors duration-150 ${
+                  isDark
+                    ? 'text-slate-400 hover:bg-white/[0.05] hover:text-white'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                }`}
+                title={`Switch to ${isDark ? 'Light' : 'Dark'} Mode`}
+                aria-label="Toggle Theme"
+              >
+                {isDark ? <Sun size={14} className="text-amber-400 transition-transform duration-300 hover:rotate-45" /> : <Moon size={14} className="text-brand-600 transition-transform duration-300 hover:-rotate-12" />}
+              </button>
+
+              {/* Divider */}
+              <div className={`h-5 w-px shrink-0 ${isDark ? 'bg-white/[0.08]' : 'bg-slate-200'}`} />
+
+              {/* User Inline */}
+              <UserMenu inline />
+            </div>
           </div>
         </div>
       </header>
