@@ -72,9 +72,7 @@ export async function connectMongo({ uri = mongoUri(), dbName = mongoDbName() } 
 
   connecting = (async () => {
     client = new MongoClient(uri, {
-      // Fail fast with a clear error instead of hanging for 30s when nothing
-      // is listening — by far the most common local setup mistake.
-      serverSelectionTimeoutMS: 5_000,
+      serverSelectionTimeoutMS: 15_000,
     })
     await client.connect()
     database = client.db(dbName)
