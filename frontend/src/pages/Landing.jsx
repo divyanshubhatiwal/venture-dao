@@ -246,7 +246,7 @@ export default function Landing() {
               <span>Autonomous Algorithmic Trading Protocol · Quantitative Telemetry</span>
             </div>
 
-            <h1 className="mt-8 text-balance text-4xl font-bold tracking-tight text-white sm:text-6xl lg:text-7xl">
+            <h1 className="mt-8 font-display text-balance text-4xl font-extrabold tracking-tight text-white sm:text-6xl lg:text-7xl">
               Autonomous Quantitative Intelligence <br />
               <span className="bg-gradient-to-r from-brand-400 via-indigo-200 to-accent bg-clip-text text-transparent">
                 Guarded by Mathematical Safety.
@@ -284,7 +284,7 @@ export default function Landing() {
         </div>
 
         {/* ── Real Decision & Portfolio Telemetry Showcase (Tilt Card) ── */}
-        <div className="relative z-10 mx-auto mt-16 max-w-5xl">
+        <div id="cockpit" className="relative z-10 mx-auto mt-16 max-w-5xl scroll-mt-24">
           <TiltCard maxTilt={4} glare={true} scale={1.01} className="rounded-2xl shadow-2xl">
             <div className="relative rounded-2xl border border-white/15 bg-ink-900/95 p-1.5 backdrop-blur-2xl shadow-[0_25px_60px_rgba(0,0,0,0.6)]">
               {/* Top terminal tab bar */}
