@@ -21,7 +21,23 @@ export function createApp() {
   app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:5173', credentials: true }))
   app.use(sessionMiddleware)
 
-  // Health endpoint
+  // Root index and health endpoints
+  app.get('/', (_req, res) =>
+    res.json({
+      ok: true,
+      service: 'Venture DAO Backend API',
+      status: 'online',
+      at: new Date().toISOString(),
+      endpoints: {
+        health: '/api/health',
+        auth: '/api/auth/me',
+        bot: '/api/bot/status',
+        news: '/api/news/markets',
+        deltaStatus: '/api/venues/delta/status',
+      },
+    }),
+  )
+
   app.get('/api/health', (_req, res) =>
     res.json({ ok: true, service: 'venturedao-backend', at: new Date().toISOString() }),
   )
