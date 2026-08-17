@@ -5,16 +5,12 @@ import {
   createSession,
   createUser,
   deleteUser,
-  findKycRecord,
   findSessionUser,
   findUserByEmail,
   findUserById,
   getExchangeAccount,
   purgeExpiredSessions,
   saveExchangeAccount,
-  setKycLiveness,
-  setKycReview,
-  upsertKycRecord,
 } from '../storage/db.js'
 
 /**
@@ -70,16 +66,10 @@ describe('cascade delete', () => {
     await createUser(user())
     await createSession({ tokenHash: 't1', userId: 'u1', expiresAt: Date.now() + 60_000 })
     await saveExchangeAccount({ id: 'acc1', userId: 'u1', apiKey: 'k', secretSealed: 's' })
-    await upsertKycRecord({
-      userId: 'u1',
-      status: 'PENDING',
-      method: 'manual',
-      fullName: 'A',
-      dob: '1990-01-01',
-      panSealed: 'sealed',
-      panLast4: '234F',
-      submittedAt: Date.now(),
-    })
+    // Seeded directly: the KYC feature was removed, but its records were kept
+    // and a deleted user must still take theirs with them rather than leaving
+    // an encrypted PAN behind with no owner.
+    await useMongo().collection('kycRecords').insertOne({ _id: 'u1', status: 'PENDING', panLast4: '234F' })
 
     await deleteUser('u1')
 
@@ -143,62 +133,5 @@ describe('exchange accounts', () => {
     expect(await getExchangeAccount('owner', 'acc1')).toBeTruthy()
     // Guessing the id must not be enough — scoping is by owner as well.
     expect(await getExchangeAccount('someone-else', 'acc1')).toBeNull()
-  })
-})
-
-describe('kyc records', () => {
-  const submission = (over = {}) => ({
-    userId: 'u1',
-    status: 'PENDING',
-    method: 'manual',
-    fullName: 'A Person',
-    dob: '1990-01-01',
-    panSealed: 'sealed',
-    panLast4: '234F',
-    submittedAt: 1_000,
-    ...over,
-  })
-
-  it('keys the record on the user, so a resubmission cannot make a second one', async () => {
-    await upsertKycRecord(submission())
-    await upsertKycRecord(submission({ fullName: 'Corrected Name', submittedAt: 2_000 }))
-    expect(await useMongo().collection('kycRecords').countDocuments()).toBe(1)
-    expect((await findKycRecord('u1')).fullName).toBe('Corrected Name')
-  })
-
-  /* The failure this prevents: a rejected applicant fixes a typo and resubmits,
-     and the stale rejection reason rides along on the new PENDING record. */
-  it('clears the previous review when a rejected applicant resubmits', async () => {
-    await upsertKycRecord(submission())
-    await setKycReview('u1', { status: 'REJECTED', reviewedAt: 1_500, reviewedBy: 'op', reason: 'blurry' })
-    await upsertKycRecord(submission({ submittedAt: 2_000 }))
-
-    const record = await findKycRecord('u1')
-    expect(record.status).toBe('PENDING')
-    expect(record.reason).toBeNull()
-    expect(record.reviewedAt).toBeNull()
-    expect(record.reviewedBy).toBeNull()
-  })
-
-  it('records liveness without touching status', async () => {
-    await upsertKycRecord(submission())
-    await setKycLiveness('u1', { livenessAt: 5_000, livenessNote: 'a live person' })
-
-    const record = await findKycRecord('u1')
-    expect(record.livenessAt).toBe(5_000)
-    // Passing a liveness check is not being approved, and the storage layer
-    // must not be the place that quietly conflates them.
-    expect(record.status).toBe('PENDING')
-  })
-
-  it('returns the record under `userId`, not Mongo’s `_id`', async () => {
-    await upsertKycRecord(submission())
-    const record = await findKycRecord('u1')
-    expect(record.userId).toBe('u1')
-    expect(record._id).toBeUndefined()
-  })
-
-  it('returns null for a user who has not submitted', async () => {
-    expect(await findKycRecord('nobody')).toBeNull()
   })
 })

@@ -16,7 +16,6 @@ const Markets = lazy(() => import('./pages/Markets'))
 const Trading = lazy(() => import('./pages/Trading'))
 const Macro = lazy(() => import('./pages/Macro'))
 const Agent = lazy(() => import('./pages/Agent'))
-const Kyc = lazy(() => import('./pages/Kyc'))
 
 import Layout from './components/Layout'
 import ErrorBoundary from './components/ErrorBoundary'
@@ -65,7 +64,6 @@ export default function App() {
                           <Route path="trading" element={<Trading />} />
                           <Route path="macro" element={<Macro />} />
                           <Route path="agent" element={<Agent />} />
-                          <Route path="kyc" element={<Kyc />} />
                         </Route>
                       </Route>
 

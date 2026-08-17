@@ -33,13 +33,17 @@ export function decide({
   episodes = [],
   openPositions = 0,
   regime = null,
+  /* A sentiment read plus the weight it has earned. Weight is 0 until the
+     reading has been scored against real outcomes enough times to justify
+     one, so passing this in has no effect on trades until it does. */
+  sentiment = null,
   agentStopped = false,
 }) {
   const goalState = computeGoalState(config, account)
   const streaks = computeStreaks(trades)
   const machineState = deriveState({ goalState, streaks, agentStopped })
 
-  const signal = generateSignal(candles, { symbol })
+  const signal = generateSignal(candles, { symbol, sentiment })
   const atr = signal?.ok ? signal.levels.atr : null
   const price = signal?.ok ? signal.price : (candles[candles.length - 1]?.close ?? null)
   const volatilityPercent = atr && price ? (atr / price) * 100 : null

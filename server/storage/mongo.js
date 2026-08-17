@@ -45,6 +45,10 @@ const INDEXES = {
   ],
   exchangeAccounts: [{ key: { userId: 1 }, name: 'user' }],
   kycRecords: [{ key: { status: 1 }, name: 'status' }],
+  sentimentReadings: [
+    { key: { symbol: 1, readAt: 1 }, name: 'symbol_time' },
+    { key: { scored: 1 }, name: 'scored' },
+  ],
 }
 
 export function mongoUri() {
@@ -126,4 +130,7 @@ export const collections = {
   sessions: () => getDatabase().collection('sessions'),
   exchangeAccounts: () => getDatabase().collection('exchangeAccounts'),
   kycRecords: () => getDatabase().collection('kycRecords'),
+  // Sentiment readings kept so they can be scored against what price actually
+  // did afterwards. Evidence has to accumulate somewhere durable.
+  sentimentReadings: () => getDatabase().collection('sentimentReadings'),
 }

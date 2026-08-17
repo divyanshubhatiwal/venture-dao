@@ -10,7 +10,6 @@ import {
   LogOut,
   PlayCircle,
   Search,
-  ShieldCheck,
   Target,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
@@ -66,7 +65,6 @@ export default function CommandPalette() {
       { id: 'macro', label: 'Macro & Flow', hint: 'Regime, rates, positioning', icon: Compass, group: 'Go to', run: () => navigate('/macro') },
       { id: 'trading', label: 'Signals & Trading', hint: 'Scans, backtest, paper orders', icon: Bot, group: 'Go to', run: () => navigate('/trading') },
       { id: 'agent', label: 'Goal Agent', hint: 'Autonomous run with risk gates', icon: Target, group: 'Go to', run: () => navigate('/agent') },
-      { id: 'kyc', label: 'Identity verification', hint: 'KYC status and submission', icon: ShieldCheck, group: 'Go to', run: () => navigate('/kyc') },
       { id: 'demo', label: 'Start judge walkthrough', hint: 'Hands-free guided tour', icon: PlayCircle, group: 'Actions', run: () => demo?.start?.() },
       {
         id: 'signout',

@@ -15,11 +15,11 @@ import {
 } from './identity/auth.js'
 import { purgeExpiredSessions } from './storage/db.js'
 import { connectMongo, mongoDbName, mongoUri } from './storage/mongo.js'
-import { KYC_STATUS, isKycApproved, publicKyc, getRawKyc, recordLiveness, reviewKyc, submitKyc } from './identity/kyc.js'
-import { issueChallenge, purgeExpiredChallenges, verifyChallenge } from './identity/kycVideo.js'
 import { botStatus, getBot, measureStopDistances } from './trading/botService.js'
 import { suggestConfig } from './trading/suggestConfig.js'
 import { getMarketNews } from './market/news.js'
+import { analyseSentiment, hasGeminiKey } from './market/gemini.js'
+import { recordReading, scoreDueReadings, sentimentSkill } from './market/sentimentTrack.js'
 import {
   cancelOrder,
   getBalances,
@@ -157,80 +157,40 @@ app.post('/api/auth/logout', async (req, res) => {
 /** Who am I? Answers null rather than 401 so the UI can ask on every load. */
 app.get('/api/auth/me', (req, res) => res.json({ ok: true, data: { user: req.user } }))
 
-/* ---------- KYC ----------
-   Identity records are per-user and every route is behind requireAuth; the
-   owner is taken from the session, never from the request body. */
+app.get(
+  '/api/news/markets',
+  asHandler(async () => {
+    const news = await getMarketNews()
+    // Sentiment is layered on top and never gates the headlines: if Gemini is
+    // unconfigured, slow or failing, the news still renders.
+    const sentiment = await analyseSentiment(news.items)
 
-app.get('/api/kyc', requireAuth, asHandler(async (req) => publicKyc(await getRawKyc(req.user.id))))
-
-app.post(
-  '/api/kyc',
-  requireAuth,
-  asHandler((req) =>
-    submitKyc({
-      userId: req.user.id,
-      fullName: req.body?.fullName,
-      dob: req.body?.dob,
-      pan: req.body?.pan,
-      address: req.body?.address,
-    }),
-  ),
-)
-
-/**
- * Review a submission.
- *
- * Guarded by an operator token from the environment rather than a user role,
- * because there is no admin model yet and inventing one that any signed-in user
- * could reach would be worse than none. Without KYC_REVIEW_TOKEN set, nothing
- * can be approved — which is the correct default for an app that cannot
- * actually verify an identity.
- */
-app.post(
-  '/api/kyc/review',
-  asHandler((req) => {
-    const expected = process.env.KYC_REVIEW_TOKEN
-    if (!expected) {
-      throw Object.assign(new Error('Review is disabled: KYC_REVIEW_TOKEN is not configured.'), { status: 503 })
+    // Record each fresh directional read against the price at that moment, so
+    // it can be scored later against what actually happened. There is no
+    // archive of headlines to backtest against, so evidence has to accumulate
+    // forward.
+    if (sentiment.ok && !sentiment.cached) {
+      try {
+        const ticker = await getTicker(resolveConfig(), 'BTCUSD').catch(() => null)
+        const price = Number(ticker?.mark_price ?? ticker?.close ?? NaN)
+        if (Number.isFinite(price)) {
+          await recordReading({ symbol: 'BTC', sentiment: sentiment.sentiment, strength: sentiment.strength, price })
+        }
+      } catch {
+        /* Recording is best-effort; it must never break the news route. */
+      }
     }
-    if (req.headers['x-review-token'] !== expected) {
-      throw Object.assign(new Error('Not authorised to review submissions.'), { status: 403 })
-    }
-    return reviewKyc({
-      userId: req.body?.userId,
-      approve: Boolean(req.body?.approve),
-      reason: req.body?.reason ?? null,
-      reviewedBy: 'operator',
-    })
+
+    // How much say it has earned so far, returned alongside so the UI can show
+    // that it is on probation rather than quietly influencing trades.
+    const skill = await sentimentSkill().catch(() => null)
+    return { ...news, sentiment: { ...sentiment, skill } }
   }),
 )
 
-/**
- * Video liveness. The prompts are issued here and expire in minutes, so a clip
- * recorded earlier cannot contain the right answers.
- */
-app.post('/api/kyc/video/challenge', requireAuth, asHandler((req) => issueChallenge(req.user.id)))
-
-app.post(
-  '/api/kyc/video/complete',
-  requireAuth,
-  asHandler((req) => {
-    const result = verifyChallenge({
-      nonce: req.body?.nonce,
-      userId: req.user.id,
-      completedPrompts: req.body?.completedPrompts,
-      durationMs: Number(req.body?.durationMs),
-      motionScore: Number(req.body?.motionScore),
-    })
-    if (!result.ok) throw Object.assign(new Error(result.reason), { status: 400 })
-    // Advances liveness, never status. Only a reviewer can approve an identity.
-    return recordLiveness({ userId: req.user.id, note: result.note })
-  }),
-)
-
-/* Publishers send no CORS headers on their RSS, so this cannot run in the
-   browser; the cache in news.js also keeps a busy page from hammering them. */
-app.get('/api/news/markets', asHandler(() => getMarketNews()))
+/* The evidence behind sentiment's vote — deliberately readable, because an
+   input that influences trades should be arguable. */
+app.get('/api/news/sentiment/skill', asHandler(() => sentimentSkill()))
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'venturedao-backend', at: new Date().toISOString() }))
 
@@ -495,12 +455,22 @@ app.get(
 
 // Expired rows are deleted rather than left to accumulate; an expired session
 // is already refused on lookup, this just stops the table growing forever.
+/* Score sentiment readings whose horizon has elapsed. This is what turns a
+   recorded opinion into evidence. */
+setInterval(() => {
+  scoreDueReadings({
+    priceOf: async (symbol) => {
+      const ticker = await getTicker(resolveConfig(), `${symbol}USD`)
+      return Number(ticker?.mark_price ?? ticker?.close ?? NaN)
+    },
+  }).catch((err) => console.error('  sentiment scoring failed:', err.message))
+}, 60 * 60_000).unref?.()
+
 setInterval(() => {
   // Rejected rather than left unhandled: a failed sweep must not take the
   // process down an hour after boot.
   purgeExpiredSessions().catch((err) => console.error('  session purge failed:', err.message))
 }, 60 * 60_000).unref?.()
-setInterval(() => purgeExpiredChallenges(), 5 * 60_000).unref?.()
 
 await connectMongo()
   .then(() => app.listen(PORT, onListening))
@@ -515,13 +485,14 @@ await connectMongo()
 
 function onListening() {
   const config = resolveConfig()
-  console.log(`\n  VentureDAO backend  →  http://localhost:${PORT}`)
+  console.log(`\n  Venture DAO backend →  http://localhost:${PORT}`)
   console.log(`  Delta environment   →  ${config.environment.name.toUpperCase()} (${config.environment.baseUrl})`)
   console.log(`  Credentials         →  ${config.hasCredentials ? `loaded (…${config.apiKey.slice(-4)})` : 'NOT SET — public routes only'}`)
   console.log(`  Max order notional  →  ${config.maxOrderNotional}`)
   // Credentials stripped: a connection string is printed at every boot and
   // ends up in logs and screen shares.
   console.log(`  MongoDB             →  ${mongoUri().replace(/\/\/[^@]*@/, '//***@')} · db "${mongoDbName()}"`)
+  console.log(`  Gemini              →  ${hasGeminiKey() ? 'key loaded — news sentiment on' : 'no key — news sentiment off'}`)
   if (config.downgraded) {
     console.log('\n  ⚠  DELTA_ENV=live was requested but DELTA_ALLOW_LIVE is not "true".')
     console.log('     Falling back to TESTNET. Live trading needs both switches set deliberately.')

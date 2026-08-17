@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AlertTriangle, ExternalLink, Loader2, Newspaper, RefreshCw } from 'lucide-react'
+import { AlertTriangle, ExternalLink, Loader2, Newspaper, RefreshCw, Sparkles } from 'lucide-react'
 import { Card, EmptyState, SectionTitle, Skeleton } from './ui'
 import { relativeTime } from '../lib/format'
 
@@ -18,6 +18,49 @@ import { relativeTime } from '../lib/format'
  */
 
 const REFRESH_MS = 5 * 60_000
+
+
+/**
+ * Sentiment read from the headlines by Gemini.
+ *
+ * Rendered under the header rather than beside a price, and captioned as a
+ * read of the news rather than a call on the market. Sentiment shown next to a
+ * number is one small step from being taken as a forecast, and the wording is
+ * the only thing standing in the way.
+ */
+const SENTIMENT_TONE = {
+  bullish: 'border-emerald-500/25 bg-emerald-500/[0.07] text-emerald-200',
+  bearish: 'border-rose-500/25 bg-rose-500/[0.07] text-rose-200',
+  neutral: 'border-white/10 bg-white/[0.03] text-slate-300',
+}
+
+function Sentiment({ data }) {
+  // Absent or unconfigured: show nothing at all. An empty state for a feature
+  // that is simply switched off is noise.
+  if (!data?.ok) return null
+  return (
+    <div className={`mb-3 rounded-xl border p-3 ${SENTIMENT_TONE[data.sentiment] ?? SENTIMENT_TONE.neutral}`}>
+      <div className="flex items-center gap-2">
+        <Sparkles size={13} className="shrink-0" />
+        <p className="text-[11px] font-semibold uppercase tracking-wide">
+          Headlines read as {data.sentiment}
+        </p>
+        <span className="ml-auto text-[10px] opacity-70">{Math.round(data.strength * 100)}% lean</span>
+      </div>
+      <p className="mt-1.5 text-[12px] leading-relaxed opacity-95">{data.summary}</p>
+      {data.themes?.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {data.themes.map((t) => (
+            <span key={t} className="rounded-md border border-current/20 px-1.5 py-0.5 text-[10px] opacity-80">
+              {t}
+            </span>
+          ))}
+        </div>
+      )}
+      <p className="mt-2 text-[10px] leading-relaxed opacity-60">{data.caveat}</p>
+    </div>
+  )
+}
 
 const SOURCE_TONE = {
   'Business Standard': 'text-sky-300',
@@ -79,6 +122,8 @@ export default function MarketNews() {
           </button>
         }
       />
+
+      <Sentiment data={news?.sentiment} />
 
       {/* Age is stated whenever the payload is not fresh, so nobody reads an
           hour-old list as the last five minutes. */}

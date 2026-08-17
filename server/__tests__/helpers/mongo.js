@@ -32,9 +32,13 @@ export function withMongo() {
 
   beforeEach(async () => {
     const db = useMongo()
+    // Every collection, discovered rather than listed. A hardcoded list goes
+    // stale the moment someone adds a collection, and the failure is data
+    // bleeding between tests — which reads as a logic bug anywhere but here.
+    //
     // deleteMany rather than dropping: dropping a collection drops its indexes
-    // with it, and the unique-email index is the thing several tests rely on.
-    for (const name of ['users', 'sessions', 'exchangeAccounts', 'kycRecords']) {
+    // with it, and the unique-email index is what several tests rely on.
+    for (const { name } of await db.listCollections().toArray()) {
       await db.collection(name).deleteMany({})
     }
   })

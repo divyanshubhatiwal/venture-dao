@@ -1,4 +1,5 @@
 import { atr, bollinger, ema, macd, rangePosition, rsi, sma, swingLevels } from './indicators.js'
+import { modelOpinion } from '../agent/modelSignal.js'
 
 /**
  * Signal engine: turns real candles into a transparent, auditable read.
@@ -24,7 +25,7 @@ const BIAS = {
 /** Minimum candles before any read is meaningful (slow EMA + signal line). */
 export const MIN_CANDLES = 35
 
-export function generateSignal(candles, { symbol = '', currency = 'USD' } = {}) {
+export function generateSignal(candles, { symbol = '', currency = 'USD', sentiment = null } = {}) {
   if (!candles || candles.length < MIN_CANDLES) {
     return { ok: false, reason: `Need at least ${MIN_CANDLES} candles for a read; got ${candles?.length ?? 0}.` }
   }
@@ -53,6 +54,37 @@ export function generateSignal(candles, { symbol = '', currency = 'USD' } = {}) 
   /* ---- individual checks, each with an explicit weight ---- */
   const checks = []
   const add = (name, verdict, weight, detail) => checks.push({ name, verdict, weight, detail })
+
+  /* The trained model, weighted above any single indicator because it is
+     fitted to outcomes rather than chosen by hand — but only if it has proven
+     itself out of sample. modelOpinion() returns no opinion when it has not,
+     and today, on every market measured, it has not. The check below then
+     records that refusal as a visible neutral row rather than silently
+     omitting it, so the reader can see the model was consulted and declined. */
+  /* News sentiment, on probation.
+     It appears whether or not it has earned a vote, because a reader should be
+     able to see that it was consulted. `skill.weight` is 0 until enough
+     readings have been scored against real price moves, so until then this row
+     is visible and inert — which is the honest state of an input nobody has
+     measured yet. */
+  if (sentiment?.ok) {
+    const weight = sentiment.skill?.weight ?? 0
+    add(
+      'News sentiment',
+      weight > 0 ? sentiment.sentiment : 'neutral',
+      weight * (sentiment.strength ?? 0),
+      weight > 0
+        ? `${sentiment.sentiment} · ${sentiment.skill.reason}`
+        : `${sentiment.sentiment} read, not voting — ${sentiment.skill?.reason ?? 'not yet measured'}`,
+    )
+  }
+
+  const opinion = modelOpinion(candles, { symbol: symbol || '?' })
+  if (opinion.ok) {
+    add('Trained model', opinion.verdict, 2.5 * opinion.confidence, opinion.detail)
+  } else if (opinion.validated === false) {
+    add('Trained model', 'neutral', 0, opinion.reason)
+  }
 
   if (rsiNow != null) {
     if (rsiNow < 30) add('RSI (14)', 'bullish', 1.5, `${rsiNow.toFixed(1)} — oversold`)

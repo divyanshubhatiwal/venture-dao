@@ -63,8 +63,8 @@ server/
 │
 ├── identity/           who someone is, and their credentials
 │   ├── auth.js           passwords (scrypt), sessions, cookies
-│   ├── kyc.js            PAN records, encrypted before storage
-│   ├── kycVideo.js       liveness challenges for the camera check
+│   ├── kyc.js            PAN records — no UI reaches these any more
+│   ├── kycVideo.js       liveness challenges — no UI reaches these any more
 │   └── vault.js          AES-256-GCM encryption for anything at rest
 │
 ├── storage/            the database, and nothing else
@@ -112,7 +112,6 @@ src/
     ├── market/            live prices, candles, macro, currency conversion
     ├── trading/           indicators, signals, backtests, costs, strategies/
     ├── agent/             the decision pipeline and its reasons
-    ├── kyc/               identity client and the camera motion meter
     └── demo/              the guided tour and its dataset
 ```
 

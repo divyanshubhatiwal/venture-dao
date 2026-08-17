@@ -8,7 +8,6 @@ import {
   LogOut,
   Menu,
   Search,
-  ShieldCheck,
   Target,
   X,
 } from 'lucide-react'
@@ -23,7 +22,6 @@ const NAV = [
   { to: '/macro', label: 'Market background', icon: Compass },
   { to: '/trading', label: 'Trade', icon: Bot },
   { to: '/agent', label: 'Trading bot', icon: Target },
-  { to: '/kyc', label: 'Verify identity', icon: ShieldCheck },
 ]
 
 function Brand() {
