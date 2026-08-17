@@ -1,5 +1,5 @@
 {
-  "name": "venturedao-frontend",
+  "name": "venture-dao",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -9,11 +9,14 @@
     "preview": "vite preview --port 4173",
     "test": "vitest run",
     "test:watch": "vitest",
-    "server": "node server/index.js"
+    "server": "node server/index.js",
+    "db": "node server/scripts/startMongo.js",
+    "db:migrate": "node server/scripts/migrateSqliteToMongo.js"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^6.0.5",
     "autoprefixer": "^10.5.4",
+    "mongodb-memory-server": "^11.2.0",
     "postcss": "^8.5.26",
     "tailwindcss": "^3.4.19",
     "vite": "^8.2.0",
@@ -27,9 +30,11 @@
     "ethers": "^6.17.0",
     "express": "^5.2.1",
     "lucide-react": "^1.31.0",
+    "mongodb": "^7.5.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-router-dom": "^7.18.2",
     "recharts": "^3.10.1"
-  }
+  },
+  "description": "Venture DAO \u2014 React frontend in src/, Express + MongoDB backend in server/"
 }

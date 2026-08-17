@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { useTrading } from '../context/TradingContext'
-import { usd } from '../lib/format'
 
 const TABS = ['Positions', 'Orders', 'Trade History', 'Bot Activity']
 
@@ -12,7 +11,52 @@ const relative = (t) => {
   return `${Math.floor(s / 86400)}d ago`
 }
 
+/**
+ * Prices and P&L, at a precision that lets the row reconcile.
+ *
+ * These used to render through usd(), which rounds to whole dollars. On a
+ * position table that hides the very thing the table exists to show: an entry
+ * of 225.11 and a mark of 225.00 both printed as "$225" while the P&L column
+ * correctly read -$33, so the row looked broken and the price looked frozen.
+ * Small positions had the mirror problem — a real 0.14% gain rendered as
+ * "+$0" because the cash amount was thirteen cents.
+ *
+ * Nothing about the underlying figures changed. They were always live; the
+ * formatter was throwing the movement away before it reached the screen.
+ */
+const price = (n) => {
+  if (!Number.isFinite(n)) return '—'
+  // Decimals scale with magnitude: a 4-figure price needs cents, a sub-dollar
+  // token needs four places before any movement is visible at all.
+  const decimals = Math.abs(n) >= 1000 ? 2 : Math.abs(n) >= 1 ? 2 : 4
+  return `$${n.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}`
+}
+
+/** Cash P&L always shows cents, so a small real gain is never printed as zero. */
+const cash = (n) =>
+  !Number.isFinite(n) ? '—' : `${n < 0 ? '-' : ''}$${Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
 const Empty = ({ children }) => <p className="px-4 py-6 text-center text-xs text-slate-600">{children}</p>
+
+/**
+ * When a position was opened.
+ *
+ * Shows the clock time with the elapsed time under it. Positions opened before
+ * this column existed have no timestamp stored, so they render as a dash — an
+ * invented "just now" would be worse than an honest gap.
+ */
+const OpenedAt = ({ at }) => {
+  if (!Number.isFinite(at)) return <span className="text-slate-600">—</span>
+  const d = new Date(at)
+  return (
+    <span className="inline-block leading-tight" title={d.toLocaleString()}>
+      <span className="num text-slate-300">
+        {d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+      </span>
+      <span className="block text-[10px] text-slate-600">{relative(at)}</span>
+    </span>
+  )
+}
 
 const Head = ({ cols }) => (
   <thead>
@@ -29,7 +73,7 @@ const Head = ({ cols }) => (
 const Pnl = ({ value, pct }) => (
   <span className={`num font-semibold ${value >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
     {value >= 0 ? '+' : ''}
-    {usd(value)}
+    {cash(value)}
     {pct != null && <span className="ml-1 text-[10px] opacity-70">({pct >= 0 ? '+' : ''}{pct}%)</span>}
   </span>
 )
@@ -72,17 +116,18 @@ export default function TradingTabs() {
           (positions.length === 0 ? (
             <Empty>No open positions.</Empty>
           ) : (
-            <table className="w-full min-w-[560px] text-xs">
-              <Head cols={['Symbol', 'Side', 'Qty', 'Entry', 'Mark', 'Unrealised', '']} />
+            <table className="w-full min-w-[640px] text-xs">
+              <Head cols={['Symbol', 'Side', 'Qty', 'Entry', 'Mark', 'Unrealised', 'Opened', '']} />
               <tbody className="divide-y divide-white/[0.05]">
                 {positions.map((p) => (
                   <tr key={p.id} className="hover:bg-white/[0.03]">
                     <td className="px-3 py-2 num font-bold text-slate-100">{p.symbol}</td>
                     <td className={`px-3 py-2 text-right font-semibold uppercase ${p.side === 'long' ? 'text-emerald-400' : 'text-rose-400'}`}>{p.side}</td>
                     <td className="px-3 py-2 text-right num text-slate-300">{p.qty}</td>
-                    <td className="px-3 py-2 text-right num text-slate-300">{usd(p.entry)}</td>
-                    <td className="px-3 py-2 text-right num text-slate-300">{usd(p.mark)}</td>
+                    <td className="px-3 py-2 text-right num text-slate-300">{price(p.entry)}</td>
+                    <td className="px-3 py-2 text-right num text-slate-300">{price(p.mark)}</td>
                     <td className="px-3 py-2 text-right"><Pnl value={p.unrealised} pct={p.unrealisedPct} /></td>
+                    <td className="px-3 py-2 text-right"><OpenedAt at={p.openedAt} /></td>
                     <td className="px-3 py-2 text-right">
                       <button onClick={() => closePosition(p.id)} className="rounded-md border border-white/10 px-2 py-1 text-[10px] text-slate-400 transition hover:border-rose-500/40 hover:text-rose-300">
                         Close
@@ -107,7 +152,7 @@ export default function TradingTabs() {
                     <td className={`px-3 py-2 text-right font-semibold uppercase ${o.side === 'buy' ? 'text-emerald-400' : 'text-rose-400'}`}>{o.side}</td>
                     <td className="px-3 py-2 text-right text-slate-400">{o.type}</td>
                     <td className="px-3 py-2 text-right num text-slate-300">{o.qty}</td>
-                    <td className="px-3 py-2 text-right num text-slate-300">{o.fillPrice ? usd(o.fillPrice) : o.limitPrice ? usd(o.limitPrice) : '—'}</td>
+                    <td className="px-3 py-2 text-right num text-slate-300">{o.fillPrice ? price(o.fillPrice) : o.limitPrice ? price(o.limitPrice) : '—'}</td>
                     <td className="px-3 py-2 text-right">
                       <span className={`chip ${o.status === 'filled' ? 'border-emerald-500/25 text-emerald-300' : o.status === 'cancelled' ? 'border-white/10 text-slate-500' : 'border-amber-500/25 text-amber-300'}`}>
                         {o.status}
@@ -138,8 +183,8 @@ export default function TradingTabs() {
                     <td className="px-3 py-2 num font-bold text-slate-100">{t.symbol}</td>
                     <td className={`px-3 py-2 text-right font-semibold uppercase ${t.side === 'long' ? 'text-emerald-400' : 'text-rose-400'}`}>{t.side}</td>
                     <td className="px-3 py-2 text-right num text-slate-300">{t.qty}</td>
-                    <td className="px-3 py-2 text-right num text-slate-300">{usd(t.entry)}</td>
-                    <td className="px-3 py-2 text-right num text-slate-300">{usd(t.exit)}</td>
+                    <td className="px-3 py-2 text-right num text-slate-300">{price(t.entry)}</td>
+                    <td className="px-3 py-2 text-right num text-slate-300">{price(t.exit)}</td>
                     <td className="px-3 py-2 text-right"><Pnl value={t.pnl} pct={t.pnlPct} /></td>
                     <td className="px-3 py-2 text-right text-[10px] text-slate-500">{t.reason}</td>
                   </tr>

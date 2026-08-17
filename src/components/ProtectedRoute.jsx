@@ -2,16 +2,29 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 /**
- * Gate for the app routes. This hides pages, it does not secure them — the
- * code behind it is already in the bundle either way. See AuthContext for why
- * that is acceptable here and what would have to change before it isn't.
+ * Gate for anything that needs a session.
  *
- * The attempted path rides along in location state so a deep link survives the
- * detour through /login instead of dumping the user on the dashboard.
+ * It waits for `ready` before deciding. The server is the only thing that
+ * knows whether the session cookie is valid, and asking takes a round trip —
+ * redirecting on the null user we hold before that answer arrives would throw
+ * a signed-in user back to the login page on every page refresh.
+ *
+ * Worth being clear about what this is and is not: it decides what to *render*.
+ * It is not a security boundary — every protected page is still in the
+ * JavaScript bundle. The boundary is the server, which checks the session
+ * cookie on each request and answers 401 without one.
  */
 export default function ProtectedRoute() {
-  const { signedIn } = useAuth()
+  const { signedIn, ready } = useAuth()
   const location = useLocation()
+
+  if (!ready) {
+    return (
+      <div className="grid min-h-screen place-items-center">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-white/15 border-t-brand-400" />
+      </div>
+    )
+  }
 
   if (!signedIn) return <Navigate to="/login" replace state={{ from: location }} />
   return <Outlet />

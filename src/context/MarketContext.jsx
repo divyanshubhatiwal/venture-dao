@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { getTickers } from '../lib/marketApi'
-import { subscribePrices } from '../lib/priceStream'
+import { getTickers } from '../lib/market/marketApi'
+import { subscribePrices } from '../lib/market/priceStream'
 
 const MarketContext = createContext(null)
 

@@ -91,6 +91,17 @@ export function minutesToClose(at, config = {}) {
  * paper profit can evaporate before it is booked, so treating it as "target
  * reached" would stop the bot on money it never made, while ignoring it for
  * losses would let a drawdown run past the limit unnoticed.
+ *
+ * That asymmetry is deliberate for the TRIGGER, but it made the display read
+ * as broken: an account sitting on an open profit showed 0 progress, while the
+ * same account sitting on an open loss moved toward the limit immediately. The
+ * money was there either way; only one direction was being reported.
+ *
+ * So `targetAchievedPercent` still tracks realised money and still decides
+ * `targetReached`, and `netAchievedPercent` reports where the day stands with
+ * open positions included. The UI shows both — banked profit solid, open
+ * profit as a lighter segment ahead of it — so a gain is visible the moment it
+ * exists without the bot stopping on money it has not actually made.
  */
 export function dailyProgress({ startingEquity, realisedPnl = 0, unrealisedPnl = 0, config = {} }) {
   const { dailyTargetPercent = 2, dailyLossLimitPercent = 3 } = config
@@ -108,6 +119,9 @@ export function dailyProgress({ startingEquity, realisedPnl = 0, unrealisedPnl =
     remainingToTarget: Math.max(0, targetAmount - realisedPnl),
     returnPercent: startingEquity > 0 ? (netPnl / startingEquity) * 100 : 0,
     targetAchievedPercent: targetAmount > 0 ? Math.min(100, (realisedPnl / targetAmount) * 100) : 0,
+    /* Display only. Includes open positions, so profit shows up the instant it
+       exists — but it never gates anything, because it can still evaporate. */
+    netAchievedPercent: targetAmount > 0 ? Math.min(100, Math.max(0, (netPnl / targetAmount) * 100)) : 0,
     targetReached: realisedPnl >= targetAmount,
     lossLimitHit: netPnl <= -lossLimitAmount,
   }

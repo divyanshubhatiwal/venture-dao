@@ -23,18 +23,19 @@ import {
 } from 'lucide-react'
 import { Card, ChartTooltip, Chip, EmptyState, PageHeader, SectionTitle, Skeleton } from '../components/ui'
 import LiveValue, { LiveBadge } from '../components/LiveValue'
+import MarketNews from '../components/MarketNews'
 import { useTrading } from '../context/TradingContext'
 import { useMarket } from '../context/MarketContext'
 import { useEpisodes } from '../context/EpisodeContext'
 import { useDemo } from '../context/DemoContext'
 import { useToast } from '../context/ToastContext'
-import { getMacro } from '../lib/macro'
-import { adjustConfidence } from '../lib/episodes'
-import { getCandles, WATCHLIST } from '../lib/marketApi'
-import { getStockCandles, getStockQuotes, STOCKS } from '../lib/stockApi'
-import { explainSignal, generateSignal } from '../lib/signals'
-import { backtest, verdict } from '../lib/backtest'
-import { VENUES } from '../lib/venues'
+import { getMacro } from '../lib/market/macro'
+import { adjustConfidence } from '../lib/agent/episodes'
+import { getCandles, WATCHLIST } from '../lib/market/marketApi'
+import { getStockCandles, getStockQuotes, STOCKS } from '../lib/market/stockApi'
+import { explainSignal, generateSignal } from '../lib/trading/signals'
+import { backtest, verdict } from '../lib/trading/backtest'
+import { VENUES } from '../lib/trading/venues'
 import { num } from '../lib/format'
 
 /** Hard cap on any single position, as a percentage of account equity. */
@@ -200,16 +201,8 @@ export default function Trading() {
 
   /* ---------- prices into the engine ---------- */
 
-  // Crypto marks arrive on the websocket, so push them through on every tick
-  // rather than on a timer — this is what makes P&L move continuously.
-  useEffect(() => {
-    const map = {}
-    market.tickers.forEach((t) => {
-      if (t.price) map[t.symbol] = t.price
-    })
-    if (Object.keys(map).length) trading.updatePrices(map)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [market.tickers])
+  // Marks are fed by TradingContext itself now, so positions keep marking to
+  // market on every screen rather than only this one. This page just reads.
 
   // Equities have no public stream; poll them hard instead.
   const [equityFeed, setEquityFeed] = useState({ open: null, at: null })
@@ -219,11 +212,7 @@ export default function Trading() {
       try {
         const { rows } = await getStockQuotes()
         if (!alive) return
-        const map = {}
-        rows.forEach((r) => {
-          if (r.price) map[r.symbol] = r.price
-        })
-        if (Object.keys(map).length) trading.updatePrices(map)
+        // Only the session indicator now; the provider owns the marks.
         setEquityFeed({ open: rows.some((r) => r.marketOpen), at: Date.now() })
       } catch {
         /* equities unavailable — crypto marks still flow */
@@ -389,7 +378,7 @@ export default function Trading() {
           toast({
             tone: 'info',
             title: `Agent opened ${signal.direction} ${asset.symbol}`,
-            description: `${qty} @ ${money(signal.levels.entry)} · stop ${money(signal.levels.stop)} · paper account`,
+            description: `${qty} @ ${money(signal.levels.entry)} · stop ${money(signal.levels.stop)} · practice account`,
           })
         } catch (err) {
           toast({ tone: 'error', title: `Agent could not trade ${asset.symbol}`, description: err.message })
@@ -451,7 +440,7 @@ export default function Trading() {
         entry: ticketPrice,
         source: 'manual',
       })
-      toast({ tone: 'success', title: 'Order submitted to the paper venue', description: `${ticket.side.toUpperCase()} ${ticket.qty} ${ticket.symbol}` })
+      toast({ tone: 'success', title: 'Order submitted to the practice account', description: `${ticket.side.toUpperCase()} ${ticket.qty} ${ticket.symbol}` })
     } catch (err) {
       toast({ tone: 'error', title: 'Order rejected', description: err.message })
     } finally {
@@ -471,9 +460,9 @@ export default function Trading() {
   return (
     <div className="animate-fade-up">
       <PageHeader
-        eyebrow="Execution · paper account"
-        title="Signals & Trading"
-        subtitle="The engine reads real candles, shows every check behind its call, and executes into a simulated account funded with $100,000. No real funds, no exchange keys."
+        eyebrow="Practice account"
+        title="Trade"
+        subtitle="It reads real prices, shows every check behind its decision, and trades a practice account with $100,000 of fake money. No real money is involved."
         actions={
           <>
             {regime && (
@@ -497,7 +486,7 @@ export default function Trading() {
           <p className="font-semibold">Simulated trading. Not investment advice.</p>
           <p className="mt-1 text-amber-100/70">
             Signals come from technical indicators on price history alone — no earnings, news, filings or macro. Orders fill in a
-            paper account against live prices. Nothing here places a real order or touches real funds, and no exchange API key is
+            practice account against live prices. Nothing here places a real order or touches real funds, and no exchange API key is
             stored anywhere in this app.
           </p>
         </div>
@@ -576,10 +565,16 @@ export default function Trading() {
           </div>
         </Card>
 
+        {/* News sits under the scan, in the same column, so headlines read as
+            context for the signals above rather than as another signal. */}
+        <div className="xl:col-span-2 xl:row-start-2">
+          <MarketNews />
+        </div>
+
         {/* Ticket + agent */}
         <div className="space-y-4">
           <Card className="p-5">
-            <SectionTitle icon={Target} title="Order ticket" hint="Paper venue" />
+            <SectionTitle icon={Target} title="Order ticket" hint="Practice account" />
             <form onSubmit={submit} className="space-y-3">
               <div className="grid grid-cols-2 gap-2">
                 <select
@@ -677,14 +672,14 @@ export default function Trading() {
 
               <button type="submit" disabled={submitting || !ticketPrice} className="btn-primary w-full">
                 {submitting ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
-                Submit to paper venue
+                Submit to practice account
               </button>
             </form>
           </Card>
 
           {/* Agent */}
           <Card className="p-5">
-            <SectionTitle icon={Bot} title="Automation agent" hint="Executes signals into the paper account" />
+            <SectionTitle icon={Bot} title="Automatic trading" hint="Executes signals into the practice account" />
             <button
               onClick={() => setAgent((a) => ({ ...a, enabled: !a.enabled }))}
               className={`btn w-full border ${
@@ -975,7 +970,7 @@ export default function Trading() {
                 if (!t) {
                   return (
                     <tr key={asset.symbol}>
-                      <td colSpan={9} className="px-4 py-3">
+                      <td colSpan={9} className="px-4 py-2.5">
                         <Skeleton className="h-5 w-full" />
                       </td>
                     </tr>
@@ -984,8 +979,8 @@ export default function Trading() {
                 if (!t.ok) {
                   return (
                     <tr key={asset.symbol}>
-                      <td className="px-4 py-3 font-mono text-xs font-bold text-slate-100">{asset.symbol}</td>
-                      <td colSpan={8} className="px-4 py-3 text-[11px] text-slate-500">
+                      <td className="px-4 py-2.5 font-mono text-xs font-bold text-slate-100">{asset.symbol}</td>
+                      <td colSpan={8} className="px-4 py-2.5 text-[11px] text-slate-500">
                         {t.reason}
                       </td>
                     </tr>
@@ -995,9 +990,9 @@ export default function Trading() {
                 const v = t.verdict
                 return (
                   <tr key={asset.symbol} className="transition hover:bg-white/[0.03]">
-                    <td className="px-4 py-3 font-mono text-xs font-bold text-slate-100">{asset.symbol}</td>
-                    <td className="px-4 py-3 text-right font-mono text-slate-300">{m.tradeCount}</td>
-                    <td className="px-4 py-3 text-right font-mono text-slate-300">{m.winRate != null ? `${m.winRate}%` : '—'}</td>
+                    <td className="px-4 py-2.5 font-mono text-xs font-bold text-slate-100">{asset.symbol}</td>
+                    <td className="px-4 py-2.5 text-right font-mono text-slate-300">{m.tradeCount}</td>
+                    <td className="px-4 py-2.5 text-right font-mono text-slate-300">{m.winRate != null ? `${m.winRate}%` : '—'}</td>
                     <td className={`px-4 py-3 text-right font-mono font-semibold ${m.profitFactor >= 1 ? 'text-emerald-400' : 'text-rose-400'}`}>
                       {m.profitFactor === Infinity ? '∞' : m.profitFactor}
                     </td>
@@ -1009,12 +1004,12 @@ export default function Trading() {
                       {m.totalReturn > 0 ? '+' : ''}
                       {m.totalReturn}%
                     </td>
-                    <td className="px-4 py-3 text-right font-mono text-slate-500">
+                    <td className="px-4 py-2.5 text-right font-mono text-slate-500">
                       {m.buyHoldReturn > 0 ? '+' : ''}
                       {m.buyHoldReturn}%
                     </td>
-                    <td className="px-4 py-3 text-right font-mono text-slate-400">{m.maxDrawdown}%</td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-2.5 text-right font-mono text-slate-400">{m.maxDrawdown}%</td>
+                    <td className="px-4 py-2.5">
                       <Chip tone={toneClass[v.tone] ?? toneClass.slate}>{v.label}</Chip>
                     </td>
                   </tr>
@@ -1080,24 +1075,24 @@ export default function Trading() {
                 <tbody className="divide-y divide-white/[0.05]">
                   {trading.positions.map((p) => (
                     <tr key={p.id} className="transition hover:bg-white/[0.03]">
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-2.5">
                         <span className="font-mono text-xs font-bold text-slate-100">{p.symbol}</span>
                         {p.source === 'agent' && <Chip className="ml-2 !px-1.5 !py-0 !text-[9px]">agent</Chip>}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-2.5">
                         <Chip tone={p.side === 'long' ? toneClass.emerald : toneClass.rose}>{p.side}</Chip>
                       </td>
-                      <td className="px-4 py-3 text-right font-mono text-slate-300">{num(p.qty, 4)}</td>
-                      <td className="px-4 py-3 text-right font-mono text-slate-400">{money(p.entry, p.entry >= 100 ? 2 : 4)}</td>
-                      <td className="px-4 py-3 text-right font-mono text-slate-100">
+                      <td className="px-4 py-2.5 text-right font-mono text-slate-300">{num(p.qty, 4)}</td>
+                      <td className="px-4 py-2.5 text-right font-mono text-slate-400">{money(p.entry, p.entry >= 100 ? 2 : 4)}</td>
+                      <td className="px-4 py-2.5 text-right font-mono text-slate-100">
                         <LiveValue value={p.mark} format={(v) => money(v, v >= 100 ? 2 : 4)} />
                       </td>
-                      <td className="px-4 py-3 text-right font-mono text-[11px]">
+                      <td className="px-4 py-2.5 text-right font-mono text-[11px]">
                         <span className="text-rose-300">{p.stop ? money(p.stop, 2) : '—'}</span>
                         <span className="mx-1 text-slate-700">/</span>
                         <span className="text-emerald-300">{p.target ? money(p.target, 2) : '—'}</span>
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-4 py-2.5 text-right">
                         <Pnl value={p.unrealised} pct={p.unrealisedPct} live />
                       </td>
                       <td className="py-3 pr-4 text-right">
@@ -1136,7 +1131,7 @@ export default function Trading() {
         </Card>
 
         <Card className="p-5">
-          <SectionTitle icon={TrendingUp} title="Equity curve" hint="Sampled every minute" />
+          <SectionTitle icon={TrendingUp} title="Account value over time" hint="Sampled every minute" />
           <div className="h-40">
             {equityCurve.length > 1 ? (
               <ResponsiveContainer width="100%" height="100%">
@@ -1206,15 +1201,15 @@ export default function Trading() {
               <tbody className="divide-y divide-white/[0.05]">
                 {trading.trades.slice(0, 12).map((t, i) => (
                   <tr key={`${t.id}-${i}`}>
-                    <td className="px-4 py-3 font-mono text-xs font-bold text-slate-100">{t.symbol}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-2.5 font-mono text-xs font-bold text-slate-100">{t.symbol}</td>
+                    <td className="px-4 py-2.5">
                       <Chip tone={t.side === 'long' ? toneClass.emerald : toneClass.rose}>{t.side}</Chip>
                     </td>
-                    <td className="px-4 py-3 text-right font-mono text-slate-300">{num(t.qty, 4)}</td>
-                    <td className="px-4 py-3 text-right font-mono text-slate-400">{money(t.entry, 2)}</td>
-                    <td className="px-4 py-3 text-right font-mono text-slate-400">{money(t.exit, 2)}</td>
-                    <td className="px-4 py-3 text-right text-[11px] text-slate-500">{t.reason}</td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-4 py-2.5 text-right font-mono text-slate-300">{num(t.qty, 4)}</td>
+                    <td className="px-4 py-2.5 text-right font-mono text-slate-400">{money(t.entry, 2)}</td>
+                    <td className="px-4 py-2.5 text-right font-mono text-slate-400">{money(t.exit, 2)}</td>
+                    <td className="px-4 py-2.5 text-right text-[11px] text-slate-500">{t.reason}</td>
+                    <td className="px-4 py-2.5 text-right">
                       <Pnl value={t.pnl} pct={t.pnlPct} />
                     </td>
                   </tr>

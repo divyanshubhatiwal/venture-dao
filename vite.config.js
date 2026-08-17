@@ -8,11 +8,20 @@ export default defineConfig({
     // paint light on hackathon wifi.
     rollupOptions: {
       output: {
+        /**
+         * Only react and ethers are placed by hand.
+         *
+         * recharts used to be forced into a "charts" chunk, which made it a
+         * shared chunk of the entry and earned it a modulepreload — so every
+         * visitor downloaded ~115 KB of charting library before the landing
+         * page painted, including people who never opened a chart. Left alone,
+         * the bundler puts it in a chunk shared by the lazy routes that
+         * actually use it, and it loads with the first of them.
+         */
         manualChunks(id) {
           if (!id.includes('node_modules')) return undefined
           if (id.includes('ethers')) return 'web3'
-          if (id.includes('recharts') || id.includes('d3-')) return 'charts'
-          if (id.includes('react')) return 'react'
+          if (id.includes('/react/') || id.includes('react-dom')) return 'react'
           return undefined
         },
       },

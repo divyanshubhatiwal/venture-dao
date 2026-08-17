@@ -1,8 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useTrading } from './TradingContext'
-import { aggregateEpisodes, createEpisode, reviewEpisode } from '../lib/episodes'
-import { getCandles } from '../lib/marketApi'
-import { getStockCandles } from '../lib/stockApi'
+import { aggregateEpisodes, createEpisode, reviewEpisode } from '../lib/agent/episodes'
+import { getCandles } from '../lib/market/marketApi'
+import { getStockCandles } from '../lib/market/stockApi'
 
 const EpisodeContext = createContext(null)
 

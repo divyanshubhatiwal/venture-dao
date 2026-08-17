@@ -1,6 +1,7 @@
-import { decide } from '../src/lib/agent/decision.js'
-import { computeGoalState, normaliseConfig } from '../src/lib/agent/goalManager.js'
+import { decide } from '../../src/lib/agent/decision.js'
+import { computeGoalState, normaliseConfig } from '../../src/lib/agent/goalManager.js'
 import { dailyProgress, entriesBlocked } from './dailySession.js'
+import { assessStress, STRESS_LEVEL } from '../../src/lib/trading/marketStress.js'
 
 /**
  * The autonomous loop.
@@ -109,12 +110,20 @@ export function preflight({ decision, account, config, dataAt, now = Date.now(),
      result is asking for: the losses were never directional, they were
      frictional. */
   if (config.feeBps != null && config.minRewardToCost != null && target != null) {
-    const roundTripFee = notional * (config.feeBps / 10_000) * 2
+    /* Slippage is part of the cost, not a rounding error.
+       This check used to count fees only. A fill that arrives a few basis
+       points adverse costs real money on both legs, and leaving it out
+       understated the true round trip by about a third — so trades that were
+       actually below cost were passing a gate whose whole job is to catch
+       them. On a short horizon, where cost is the binding constraint rather
+       than direction, that gap IS the 31-winners-and-still-down result. */
+    const costBps = (config.feeBps + (config.slippageBps ?? 0)) * 2
+    const roundTripCost = notional * (costBps / 10_000)
     const rewardAtTarget = Math.abs(target - entry) * decision.quantity
-    if (rewardAtTarget < roundTripFee * config.minRewardToCost) {
+    if (rewardAtTarget < roundTripCost * config.minRewardToCost) {
       return fail(
         'EDGE_BELOW_COST',
-        `Target is worth ${rewardAtTarget.toFixed(2)} against ${roundTripFee.toFixed(2)} in fees (need ${config.minRewardToCost}×).`,
+        `Target is worth ${rewardAtTarget.toFixed(2)} against ${roundTripCost.toFixed(2)} in fees and slippage (need ${config.minRewardToCost}×).`,
       )
     }
   }
@@ -148,7 +157,7 @@ export function preflight({ decision, account, config, dataAt, now = Date.now(),
   return { ok: true }
 }
 
-export function createBotEngine({ adapter, marketData, config: rawConfig, accountId = 'default', symbols = ['ETH'], intervalMs = 60_000, logger = () => {}, now = () => Date.now() }) {
+export function createBotEngine({ adapter, marketData, config: rawConfig, accountId = 'default', symbols = ['ETH'], intervalMs = 60_000, monitorMs = 5_000, logger = () => {}, now = () => Date.now() }) {
   const config = normaliseConfig(rawConfig)
 
   let state = BOT_STATES.STOPPED
@@ -159,6 +168,8 @@ export function createBotEngine({ adapter, marketData, config: rawConfig, accoun
   // fired while an order was still in flight could analyse pre-order state and
   // submit a second one.
   let cycleInFlight = false
+  let monitorInFlight = false
+  let monitorTimer = null
   const usedKeys = new Set()
   const journal = []
 
@@ -279,7 +290,25 @@ export function createBotEngine({ adapter, marketData, config: rawConfig, accoun
           record({ kind: 'no-trade', symbol, reason: decision.reason, signal: decision.signal?.bias })
           continue
         }
-        candidates.push({ symbol, decision, feed, quality: (decision.confidence ?? 0) * (decision.riskReward ?? 1) })
+        /* Market state, used defensively.
+           This is not a crash prediction — measured against ten years of data
+           it barely beats the base rate on crypto (1.07x). What it does track
+           reliably is whether the market is currently violent, and volatility
+           clusters, so trading smaller now is a bet on persistence rather than
+           on foresight. It can only ever shrink a position or block one. */
+        const stress = assessStress(feed.candles)
+        if (stress.ok && stress.level === STRESS_LEVEL.EXTREME) {
+          record({ kind: 'blocked', symbol, code: 'MARKET_STRESS', detail: `${stress.summary} (score ${stress.score})` })
+          continue
+        }
+
+        candidates.push({
+          symbol,
+          decision,
+          feed,
+          stress: stress.ok ? stress : null,
+          quality: (decision.confidence ?? 0) * (decision.riskReward ?? 1),
+        })
       }
 
       candidates.sort((a, b) => b.quality - a.quality)
@@ -287,7 +316,7 @@ export function createBotEngine({ adapter, marketData, config: rawConfig, accoun
         record({ kind: 'ranked', detail: candidates.map((c) => `${c.symbol}:${Math.round(c.quality)}`).join(' > ') })
       }
 
-      for (const { symbol, decision, feed } of candidates) {
+      for (const { symbol, decision, feed, stress } of candidates) {
 
         setState(BOT_STATES.SIGNAL_DETECTED, symbol)
         setState(BOT_STATES.RISK_CHECK, symbol)
@@ -324,10 +353,16 @@ export function createBotEngine({ adapter, marketData, config: rawConfig, accoun
 
         try {
           setState(BOT_STATES.ORDER_SUBMITTED, symbol)
+          // Stress can only reduce. A multiplier above 1 would let a market
+          // reading grow a position the risk engine already sized.
+          const damp = Math.min(1, stress?.sizeMultiplier ?? 1)
+          const sizedQty = decision.quantity * damp
+          if (damp < 1) record({ kind: 'sized-down', symbol, detail: `${stress.level}: size x${damp}` })
+
           const receipt = await adapter.submitOrder({
             symbol,
             side: decision.action === 'BUY' ? 'buy' : 'sell',
-            qty: decision.quantity,
+            qty: sizedQty,
             price: decision.levels.entry,
             stop: decision.levels.stop,
             target: decision.levels.target,
@@ -352,8 +387,43 @@ export function createBotEngine({ adapter, marketData, config: rawConfig, accoun
     }
   }
 
+  /**
+   * Exit management only — no scanning, no entries.
+   *
+   * Runs far more often than the analysis cycle because the two jobs have very
+   * different urgency. Deciding whether to open a new position can wait a
+   * minute; a stop sitting 0.4% away cannot, since price can travel through it
+   * several times over in that minute and the position would be closed at
+   * whatever it had reached by the next cycle rather than near the stop.
+   *
+   * Skipped while a full cycle is running, because that cycle already manages
+   * exits first and two closes racing on one position is how a flat book turns
+   * into an accidental short.
+   */
+  async function monitorPositions() {
+    if (monitorInFlight || cycleInFlight || emergencyStop) return []
+    if (!adapter.markToMarket) return []
+    monitorInFlight = true
+    try {
+      const open = await adapter.getPositions()
+      if (!open.length) return []
+      const closed = await adapter.markToMarket()
+      for (const t of closed) {
+        record({ kind: 'exit', symbol: t.symbol, detail: `${t.reason} @ ${t.exit} · pnl ${t.pnl ?? '—'}` })
+      }
+      if (closed.length) setState(BOT_STATES.POSITION_CLOSED, `${closed.length} closed`)
+      return closed
+    } catch (err) {
+      record({ kind: 'error', message: `monitor: ${err.message}` })
+      return []
+    } finally {
+      monitorInFlight = false
+    }
+  }
+
   return {
     getState: () => state,
+    monitorPositions,
     getJournal: () => [...journal],
     isRunning: () => running,
     runCycle,
@@ -375,6 +445,11 @@ export function createBotEngine({ adapter, marketData, config: rawConfig, accoun
       // and it delays the first scan for no benefit.
       tick()
       timer = setInterval(tick, intervalMs)
+      // Protective exits get their own, much faster heartbeat.
+      monitorTimer = setInterval(() => {
+        monitorPositions().catch(() => {})
+      }, monitorMs)
+      monitorTimer.unref?.()
       timer.unref?.()
       return state
     },
@@ -383,7 +458,9 @@ export function createBotEngine({ adapter, marketData, config: rawConfig, accoun
     pause() {
       running = false
       clearInterval(timer)
+      clearInterval(monitorTimer)
       timer = null
+      monitorTimer = null
       setState(BOT_STATES.STOPPED, 'paused')
       return state
     },
@@ -396,7 +473,9 @@ export function createBotEngine({ adapter, marketData, config: rawConfig, accoun
       emergencyStop = true
       running = false
       clearInterval(timer)
+      clearInterval(monitorTimer)
       timer = null
+      monitorTimer = null
       setState(BOT_STATES.KILL_SWITCH, reason)
       record({ kind: 'emergency-stop', reason })
       return state

@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  Activity,
   ArrowRight,
   Bot,
   Brain,
@@ -12,7 +11,6 @@ import {
   Lock,
   ShieldCheck,
   Target,
-  TrendingUp,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useMarket } from '../context/MarketContext'
@@ -20,72 +18,74 @@ import CountUp from '../components/CountUp'
 import Reveal from '../components/Reveal'
 
 /**
- * Public landing page. Everything quoted here is a number the app actually
- * produces — including the unflattering ones. A trading product that advertises
- * returns it cannot demonstrate is the exact thing this project was built to
- * argue against, so the evidence band below leads with the failed simulation
- * rather than burying it.
+ * Public landing page.
+ *
+ * Two rules hold this page together.
+ *
+ * Every number on it is one the app actually produced, including the ones that
+ * look bad. A trading product advertising returns it cannot demonstrate is the
+ * exact thing this project argues against, so the evidence section leads with
+ * the failed simulation instead of hiding it.
+ *
+ * And it is written in plain words. Not because the ideas are simple, but
+ * because dense wording is where misleading claims hide most comfortably —
+ * "adversarial critic pass" sounds impressive and tells a reader nothing. If a
+ * sentence here cannot survive being said simply, it probably should not be
+ * said.
  */
 
 const FEATURES = [
   {
     icon: Target,
-    tag: 'AUTO',
-    title: 'Goal-based agent',
-    body: 'Runs a full decision cycle across four assets every two minutes and acts on the best surviving opportunity — or does nothing at all, which is most cycles.',
+    title: 'It decides on its own',
+    body: 'Every two minutes it looks at four markets and picks the best trade it can find. Most of the time it finds none and does nothing.',
   },
   {
     icon: ShieldCheck,
-    tag: 'RISK',
-    title: 'The risk engine runs last',
-    body: 'Signal, then an adversarial critic, then risk. Every stage can only shrink the position, never grow it. Martingale and revenge trading are structurally impossible, not merely discouraged.',
+    title: 'Risk gets the last word',
+    body: 'Three checks run in order, and each one can only make a trade smaller — never bigger. Doubling down after a loss cannot happen.',
   },
   {
     icon: CandlestickChart,
-    tag: 'LIVE',
-    title: 'Streaming market data',
-    body: 'Prices arrive over a Binance WebSocket and update continuously, with reconnect backoff. Nothing on screen is a thirty-second-old snapshot pretending to be live.',
+    title: 'Prices are live',
+    body: 'Prices stream in from Binance and update as they move. Nothing on screen is an old number pretending to be current.',
   },
   {
     icon: Compass,
-    tag: 'CTX',
-    title: 'Macro & flow context',
-    body: 'Funding rates, cross-venue divergence and regime read, so a signal is judged against the environment it fires in rather than in isolation.',
+    title: 'It reads the wider market',
+    body: 'A trade is judged against what the rest of the market is doing, not on its own. A good setup in a bad week is still a bad trade.',
   },
   {
     icon: Dices,
-    tag: 'PROOF',
-    title: 'Monte Carlo validation',
-    body: 'Two thousand runs resample the strategy’s own trades in random order. If the goal is unreachable, the app says so on the same screen as the goal.',
+    title: 'It tests itself 2,000 times',
+    body: 'It replays its own past trades in random orders to see how else things could have gone. If your goal is out of reach, it says so.',
   },
   {
     icon: Brain,
-    tag: 'LEARN',
-    title: 'Post-trade grading',
-    body: 'Every episode is scored on whether the reasoning was sound, separately from whether the trade won. Being right for the wrong reason counts as a loss.',
+    title: 'It grades its own thinking',
+    body: 'Each trade is scored on whether the reasoning was sound, separately from whether it made money. Being right by luck counts as a loss.',
   },
 ]
 
 const EVIDENCE = [
-  { value: '31 / 31', label: 'winning scalp trades', note: 'and the account still lost 6.16% — fees were 4× the gross profit' },
-  { value: '0%', label: 'of runs reached the goal', note: '2,000 Monte Carlo runs; 100% hit the drawdown stop' },
-  { value: '0.94', label: 'best profit factor found', note: 'across six symbols and every variant tried — still below 1.0' },
-  { value: '$0.00', label: 'of real money at risk', note: 'testnet only; live mode needs two switches the app will not flip' },
+  { value: '31 / 31', label: 'trades won', note: 'and the account still lost 6.16% — fees cost 4× what the trades made' },
+  { value: '0%', label: 'of tests reached the goal', note: '2,000 runs, and every one hit the loss limit first' },
+  { value: '0.94', label: 'best score found', note: 'anything under 1.0 loses money. We tried six markets and every variation.' },
+  { value: '$0.00', label: 'of real money at risk', note: 'practice mode only — real trading needs two switches this app will not flip' },
 ]
 
-/** Facts about the build, each one countable from the repo or a run log. */
 const SCALE = [
-  { value: 2000, label: 'Monte Carlo runs per simulation' },
-  { value: 40, label: 'safety tests on the risk engine' },
-  { value: 9, label: 'world indices streamed live' },
-  { value: 4, label: 'assets scanned every cycle' },
+  { value: 2000, label: 'test runs per simulation' },
+  { value: 40, label: 'safety tests on the risk rules' },
+  { value: 9, label: 'world markets streamed live' },
+  { value: 4, label: 'markets checked every cycle' },
 ]
 
 const PIPELINE = [
-  { step: '01', title: 'Signal', body: 'A setup is proposed from price structure and macro context.' },
-  { step: '02', title: 'Critic', body: 'An adversarial pass hunts for reasons the setup is wrong. Critical findings veto it outright.' },
-  { step: '03', title: 'Risk engine', body: 'Hard gates check drawdown, daily loss, streaks and expected value. It runs last and cannot be overridden.' },
-  { step: '04', title: 'Execution', body: 'Whatever survives is sized in R and routed to the paper simulator or Delta testnet.' },
+  { step: '01', title: 'Find', body: 'It spots a possible trade from price movement and market conditions.' },
+  { step: '02', title: 'Challenge', body: 'A second pass tries to prove the trade wrong. If it finds something serious, the trade is dropped.' },
+  { step: '03', title: 'Limit', body: 'Hard limits check losses, losing streaks and whether the odds are good enough. This step cannot be overruled.' },
+  { step: '04', title: 'Place', body: 'Anything that survives is sized carefully and sent to the practice account.' },
 ]
 
 /**
@@ -104,29 +104,42 @@ function LaunchButton({ className = '' }) {
   )
 }
 
+/** Eyebrow → headline → optional standfirst. Every section opens the same way,
+ *  which is most of what makes a long page feel composed rather than assembled. */
+function SectionHead({ eyebrow, title, children, align = 'left' }) {
+  return (
+    <div className={align === 'center' ? 'mx-auto max-w-2xl text-center' : 'max-w-2xl'}>
+      <p className="text-[11px] font-semibold uppercase tracking-[.18em] text-brand-300/80">{eyebrow}</p>
+      <h2 className="mt-3 text-3xl font-semibold leading-[1.15] tracking-tight text-white sm:text-[2.75rem]">{title}</h2>
+      {children && <p className="mt-5 text-[15px] leading-relaxed text-slate-400">{children}</p>}
+    </div>
+  )
+}
+
 function Nav({ showCta }) {
   return (
-    <header className="sticky top-0 z-30 border-b border-white/[0.07] bg-ink-950/70 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3.5 sm:px-6">
+    <header className="sticky top-0 z-30 border-b border-white/[0.06] bg-ink-950/70 backdrop-blur-xl">
+      <div className="mx-auto flex max-w-6xl items-center gap-3 px-5 py-4 sm:px-8">
         <div className="flex items-center gap-2.5">
           <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-brand-500 to-accent shadow-glow">
             <svg viewBox="0 0 64 64" className="h-5 w-5">
               <path d="M16 18l16 30 16-30" fill="none" stroke="white" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </span>
-          <div className="leading-tight">
-            <p className="text-[15px] font-bold tracking-tight text-white">VentureDAO</p>
-            <p className="text-[10px] font-medium uppercase tracking-[.16em] text-slate-500">Investment Intelligence</p>
-          </div>
+          <p className="text-[15px] font-semibold tracking-tight text-white">Venture DAO</p>
         </div>
 
         <nav className="ml-auto hidden items-center gap-1 md:flex">
           {[
-            ['Features', '#features'],
+            ['What it does', '#features'],
             ['How it works', '#pipeline'],
-            ['Evidence', '#evidence'],
+            ['The results', '#evidence'],
           ].map(([label, href]) => (
-            <a key={href} href={href} className="rounded-lg px-3 py-2 text-sm text-slate-400 transition hover:bg-white/[0.05] hover:text-slate-100">
+            <a
+              key={href}
+              href={href}
+              className="rounded-lg px-3.5 py-2 text-sm text-slate-400 transition hover:bg-white/[0.05] hover:text-white"
+            >
               {label}
             </a>
           ))}
@@ -135,7 +148,7 @@ function Nav({ showCta }) {
         {/* Kept mounted and faded rather than unmounted, so revealing it on
             scroll does not reflow the header. */}
         <div
-          className={`ml-auto transition-opacity duration-200 md:ml-4 ${showCta ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+          className={`ml-auto transition-opacity duration-200 md:ml-5 ${showCta ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
           aria-hidden={!showCta}
         >
           <LaunchButton className="btn-primary btn-sm sm:px-4 sm:py-2 sm:text-sm" />
@@ -161,11 +174,11 @@ function Ticker() {
   if (rows.length < 2) return null
 
   const Row = ({ hidden }) => (
-    <div className="flex shrink-0 items-center gap-8 px-4" aria-hidden={hidden || undefined}>
+    <div className="flex shrink-0 items-center gap-10 px-5" aria-hidden={hidden || undefined}>
       {rows.map((t) => (
         <span key={t.symbol} className="flex items-center gap-2 whitespace-nowrap text-xs">
-          <span className="font-mono font-bold text-slate-300">{t.symbol}</span>
-          <span className="num text-slate-400">
+          <span className="font-mono font-semibold text-slate-400">{t.symbol}</span>
+          <span className="num text-slate-500">
             ${t.price?.toLocaleString('en-US', { maximumFractionDigits: t.price >= 100 ? 0 : 2 })}
           </span>
           <span className={`num font-semibold ${(t.change24h ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
@@ -178,87 +191,81 @@ function Ticker() {
   )
 
   return (
-    <div className="relative overflow-hidden border-b border-white/[0.07] bg-white/[0.02] py-2.5">
+    <div className="relative overflow-hidden border-b border-white/[0.06] bg-white/[0.015] py-3">
       <div className="flex w-max animate-marquee">
         <Row />
         <Row hidden />
       </div>
       {/* Fade the strip into the page edges so items do not pop in and out. */}
-      <div aria-hidden className="pointer-events-none absolute inset-y-0 left-0 w-16 bg-gradient-to-r from-ink-950 to-transparent" />
-      <div aria-hidden className="pointer-events-none absolute inset-y-0 right-0 w-16 bg-gradient-to-l from-ink-950 to-transparent" />
+      <div aria-hidden className="pointer-events-none absolute inset-y-0 left-0 w-20 bg-gradient-to-r from-ink-950 to-transparent" />
+      <div aria-hidden className="pointer-events-none absolute inset-y-0 right-0 w-20 bg-gradient-to-l from-ink-950 to-transparent" />
     </div>
   )
 }
 
 function Hero({ ctaRef }) {
   return (
-    <section className="relative overflow-hidden px-4 pb-20 pt-16 sm:px-6 sm:pt-24">
+    <section className="relative overflow-hidden px-5 pb-24 pt-20 sm:px-8 sm:pb-32 sm:pt-28">
       {/* Decorative only — hidden from assistive tech rather than announced as an image. */}
       <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 grid-bg" />
-      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[620px] overflow-hidden">
-        <div className="absolute -top-40 left-1/2 h-[460px] w-[620px] -translate-x-2/3 animate-drift-a rounded-full bg-brand-500/25 blur-[120px]" />
-        <div className="absolute -top-24 left-1/2 h-[420px] w-[560px] -translate-x-1/4 animate-drift-b rounded-full bg-accent/20 blur-[120px]" />
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[680px] overflow-hidden">
+        <div className="absolute -top-48 left-1/2 h-[480px] w-[660px] -translate-x-2/3 animate-drift-a rounded-full bg-brand-500/20 blur-[130px]" />
+        <div className="absolute -top-28 left-1/2 h-[440px] w-[580px] -translate-x-1/4 animate-drift-b rounded-full bg-accent/15 blur-[130px]" />
       </div>
 
-      <div className="mx-auto max-w-4xl text-center">
-        <span className="chip border-brand-500/30 bg-brand-500/10 text-brand-200">
+      <div className="mx-auto max-w-3xl text-center">
+        <span className="chip border-brand-500/25 bg-brand-500/[0.08] text-brand-200">
           <span className="live-dot" />
-          Delta testnet connected · live streaming data
+          Live prices · practice account
         </span>
 
-        <h1 className="mt-6 text-balance text-4xl font-extrabold leading-[1.08] tracking-tight text-white sm:text-6xl">
-          An autonomous trading agent that <span className="grad-text">tells you when it has no edge</span>
+        <h1 className="mt-8 text-balance text-[2.75rem] font-semibold leading-[1.06] tracking-[-0.02em] text-white sm:text-7xl">
+          A trading bot that admits <span className="grad-text">when it can&rsquo;t win</span>
         </h1>
 
-        <p className="mx-auto mt-6 max-w-2xl text-pretty text-base leading-relaxed text-slate-400 sm:text-lg">
-          VentureDAO runs a goal-based agent over live crypto markets: capital protection first, target second. It
-          backtests itself, simulates two thousand futures, and refuses to trade a setup it cannot show an edge for.
+        <p className="mx-auto mt-7 max-w-xl text-pretty text-lg leading-relaxed text-slate-400">
+          It watches live markets, protects your money first and chases profit second. Before it trades, it has to prove
+          the trade is worth making. Usually it can&rsquo;t — so it waits.
         </p>
 
-        <div ref={ctaRef} className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <LaunchButton className="btn-primary w-full px-6 py-3 text-base sm:w-auto" />
-          <a href="#evidence" className="btn-ghost w-full px-6 py-3 text-base sm:w-auto">
-            See what it measured
+        <div ref={ctaRef} className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
+          <LaunchButton className="btn-primary w-full px-7 py-3.5 text-base sm:w-auto" />
+          <a href="#evidence" className="btn-ghost w-full px-7 py-3.5 text-base sm:w-auto">
+            See the results
           </a>
         </div>
 
-        <p className="mt-5 text-xs text-slate-500">
-          Paper account by default · no card, no funding, no live orders
-        </p>
+        <p className="mt-6 text-[13px] text-slate-500">No card. No deposit. No real trades.</p>
       </div>
 
-      {/* Terminal-style panel: a real decision block, formatted the way the app prints one. */}
-      <div className="mx-auto mt-16 max-w-3xl">
+      {/* A real decision block, printed the way the app prints one. */}
+      <div className="mx-auto mt-20 max-w-2xl">
         <div className="card overflow-hidden">
-          <div className="flex items-center gap-2 border-b border-white/[0.07] bg-white/[0.02] px-4 py-2.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-rose-400/70" />
-            <span className="h-2.5 w-2.5 rounded-full bg-amber-400/70" />
-            <span className="h-2.5 w-2.5 rounded-full bg-emerald-400/70" />
-            <p className="ml-2 font-mono text-[11px] text-slate-500">agent · decision cycle</p>
-            <span className="ml-auto chip border-emerald-500/30 bg-emerald-500/10 text-emerald-300">NO TRADE</span>
+          <div className="flex items-center gap-2 border-b border-white/[0.06] bg-white/[0.02] px-4 py-3">
+            <span className="h-2.5 w-2.5 rounded-full bg-rose-400/60" />
+            <span className="h-2.5 w-2.5 rounded-full bg-amber-400/60" />
+            <span className="h-2.5 w-2.5 rounded-full bg-emerald-400/60" />
+            <p className="ml-2 font-mono text-[11px] text-slate-500">a real decision</p>
+            <span className="ml-auto chip border-emerald-500/25 bg-emerald-500/[0.08] text-emerald-300">NO TRADE</span>
           </div>
-          <pre className="overflow-x-auto px-4 py-4 text-left font-mono text-[11px] leading-relaxed text-slate-400 sm:text-xs">
-{`━━━ AI TRADING DECISION ━━━
-  asset        ETH-PERP
-  signal       long · momentum continuation
-  critic       stop is 0.83× ATR — too tight for
-               current volatility  [CRITICAL]
-  risk engine  VETO · no demonstrated edge on
-               this symbol (evidence gate)
-  action       stand down, log the episode
-━━━━━━━━━━━━━━━━━━━━━━━━━━━`}
+          <pre className="overflow-x-auto px-5 py-5 text-left font-mono text-[11px] leading-[1.9] text-slate-400 sm:text-xs">
+{`market      ETH
+idea        buy — price is trending up
+challenge   the safety net is too close to the
+            price for how much it's moving today
+decision    skip it — no proof this market
+            is worth trading
+result      wait, and write down why`}
           </pre>
         </div>
-        <p className="mt-3 text-center text-xs text-slate-600">
-          Most cycles end like this. That is the feature.
-        </p>
+        <p className="mt-4 text-center text-[13px] text-slate-500">Most decisions end this way. That is the point.</p>
       </div>
 
-      <div className="mx-auto mt-16 grid max-w-4xl grid-cols-2 gap-px overflow-hidden rounded-2xl border border-white/[0.07] bg-white/[0.06] sm:grid-cols-4">
+      <div className="mx-auto mt-20 grid max-w-3xl grid-cols-2 gap-px overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.05] sm:grid-cols-4">
         {SCALE.map(({ value, label }, i) => (
-          <Reveal key={label} delay={i * 70} className="bg-ink-950/70 px-4 py-5 text-center">
-            <CountUp value={value} className="num text-2xl font-bold text-white" />
-            <p className="mt-1.5 text-[11px] leading-snug text-slate-500">{label}</p>
+          <Reveal key={label} delay={i * 70} className="bg-ink-950/70 px-4 py-6 text-center">
+            <CountUp value={value} className="num text-[1.75rem] font-semibold text-white" />
+            <p className="mt-2 text-[11px] leading-snug text-slate-500">{label}</p>
           </Reveal>
         ))}
       </div>
@@ -268,26 +275,20 @@ function Hero({ ctaRef }) {
 
 function Features() {
   return (
-    <section id="features" className="scroll-mt-20 px-4 py-16 sm:px-6">
+    <section id="features" className="scroll-mt-20 px-5 py-24 sm:px-8 sm:py-28">
       <div className="mx-auto max-w-6xl">
-        <p className="label">What it does</p>
-        <h2 className="mt-2 max-w-2xl text-3xl font-bold tracking-tight text-white sm:text-4xl">
-          Eight modules, one rule: the risk engine has the last word
-        </h2>
+        <SectionHead eyebrow="What it does" title="Six parts, one rule">
+          The safety limits always run last, so nothing else can talk the bot into a bigger bet.
+        </SectionHead>
 
-        <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {FEATURES.map(({ icon: Icon, tag, title, body }, i) => (
-            <Reveal as="article" key={title} delay={(i % 3) * 80} className="card card-hover group p-5">
-              <div className="flex items-center gap-3">
-                <span className="grid h-10 w-10 place-items-center rounded-xl border border-white/10 bg-white/[0.04] transition group-hover:border-brand-400/40 group-hover:bg-brand-500/10">
-                  <Icon size={18} className="text-brand-300" />
-                </span>
-                <span className="ml-auto rounded-md border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[10px] text-slate-500">
-                  {tag}
-                </span>
-              </div>
-              <h3 className="mt-4 text-base font-semibold text-white">{title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-slate-400">{body}</p>
+        <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {FEATURES.map(({ icon: Icon, title, body }, i) => (
+            <Reveal as="article" key={title} delay={(i % 3) * 80} className="card card-hover group p-6">
+              <span className="grid h-11 w-11 place-items-center rounded-xl border border-white/[0.08] bg-white/[0.03] transition group-hover:border-brand-400/40 group-hover:bg-brand-500/10">
+                <Icon size={18} className="text-brand-300" />
+              </span>
+              <h3 className="mt-5 text-[17px] font-semibold tracking-tight text-white">{title}</h3>
+              <p className="mt-2.5 text-[14px] leading-relaxed text-slate-400">{body}</p>
             </Reveal>
           ))}
         </div>
@@ -298,30 +299,23 @@ function Features() {
 
 function Pipeline() {
   return (
-    <section id="pipeline" className="scroll-mt-20 px-4 py-16 sm:px-6">
+    <section id="pipeline" className="scroll-mt-20 px-5 py-24 sm:px-8 sm:py-28">
       <div className="mx-auto max-w-6xl">
-        <p className="label">How a trade is decided</p>
-        <h2 className="mt-2 max-w-2xl text-3xl font-bold tracking-tight text-white sm:text-4xl">
-          Four stages, each able only to shrink the position
-        </h2>
-        <p className="mt-4 max-w-2xl text-sm leading-relaxed text-slate-400">
-          Ordering matters. Because risk evaluates last and its output is capped at the configured base risk, no
-          upstream stage — including the language model — can talk the system into a bigger bet after a loss.
-        </p>
+        <SectionHead eyebrow="How it works" title="Four steps to every trade">
+          Each step can only shrink a trade, never grow it. That order is what stops the bot chasing a loss.
+        </SectionHead>
 
-        <ol className="mt-10 grid gap-4 md:grid-cols-4">
+        <ol className="mt-14 grid gap-5 md:grid-cols-4">
           {PIPELINE.map(({ step, title, body }, i) => (
-            <Reveal as="li" key={step} delay={i * 90} className="card card-hover relative p-5">
-              <span className="grid h-8 w-8 place-items-center rounded-lg border border-brand-400/30 bg-brand-500/10 font-mono text-xs font-bold text-brand-200">
-                {step}
-              </span>
-              <h3 className="mt-3.5 text-base font-semibold text-white">{title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-slate-400">{body}</p>
+            <Reveal as="li" key={step} delay={i * 90} className="card card-hover relative p-6">
+              <span className="num text-sm font-semibold text-brand-300/70">{step}</span>
+              <h3 className="mt-3 text-[17px] font-semibold tracking-tight text-white">{title}</h3>
+              <p className="mt-2.5 text-[14px] leading-relaxed text-slate-400">{body}</p>
               {i < PIPELINE.length - 1 && (
                 <ArrowRight
                   aria-hidden
-                  size={16}
-                  className="absolute -right-2.5 top-1/2 hidden -translate-y-1/2 text-slate-700 md:block"
+                  size={15}
+                  className="absolute -right-3 top-1/2 hidden -translate-y-1/2 text-slate-700 md:block"
                 />
               )}
             </Reveal>
@@ -332,40 +326,42 @@ function Pipeline() {
   )
 }
 
+/**
+ * The most important section on the page, and the reason for the plain wording
+ * everywhere else: these numbers say the strategy loses money. They are stated
+ * in words a reader cannot mistake — "anything under 1.0 loses money" rather
+ * than "profit factor 0.94".
+ */
 function Evidence() {
   return (
-    <section id="evidence" className="scroll-mt-20 px-4 py-16 sm:px-6">
+    <section id="evidence" className="scroll-mt-20 px-5 py-24 sm:px-8 sm:py-28">
       <div className="mx-auto max-w-6xl">
         <div className="card overflow-hidden">
-          <div className="border-b border-white/[0.07] bg-gradient-to-r from-brand-500/10 to-accent/5 px-6 py-5">
-            <div className="flex items-center gap-2">
-              <Activity size={16} className="text-brand-300" />
-              <p className="label text-brand-200">Measured, not promised</p>
-            </div>
-            <h2 className="mt-2 text-2xl font-bold tracking-tight text-white sm:text-3xl">
-              The strategy does not currently have an edge
+          <div className="border-b border-white/[0.06] bg-gradient-to-br from-brand-500/[0.08] to-accent/[0.04] px-7 py-8 sm:px-9">
+            <p className="text-[11px] font-semibold uppercase tracking-[.18em] text-brand-300/80">Measured, not promised</p>
+            <h2 className="mt-3 max-w-2xl text-[1.75rem] font-semibold leading-tight tracking-tight text-white sm:text-[2.5rem]">
+              Right now, this strategy loses money
             </h2>
-            <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-400">
-              Every figure below came out of this app. They are on the landing page for the same reason they are on the
-              agent screen: a trading tool that only shows you its good simulations is not a tool, it is a pitch.
+            <p className="mt-5 max-w-2xl text-[15px] leading-relaxed text-slate-400">
+              Every number below came out of this app. They are here for the same reason they are inside it: a trading
+              tool that only shows you its wins is not a tool, it is a sales pitch.
             </p>
           </div>
 
-          <div className="grid gap-px bg-white/[0.06] sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-px bg-white/[0.05] sm:grid-cols-2 lg:grid-cols-4">
             {EVIDENCE.map(({ value, label, note }, i) => (
-              <Reveal key={label} delay={i * 70} className="bg-ink-950/60 p-5">
-                <p className="num text-2xl font-bold text-white">{value}</p>
-                <p className="mt-1 text-sm font-medium text-slate-300">{label}</p>
-                <p className="mt-2 text-xs leading-relaxed text-slate-500">{note}</p>
+              <Reveal key={label} delay={i * 70} className="bg-ink-950/60 p-6">
+                <p className="num text-[1.75rem] font-semibold text-white">{value}</p>
+                <p className="mt-1.5 text-sm font-medium text-slate-300">{label}</p>
+                <p className="mt-2.5 text-xs leading-relaxed text-slate-500">{note}</p>
               </Reveal>
             ))}
           </div>
 
-          <div className="flex flex-col gap-3 border-t border-white/[0.07] px-6 py-5 sm:flex-row sm:items-center">
-            <TrendingUp size={18} className="shrink-0 text-slate-500" />
-            <p className="text-sm leading-relaxed text-slate-400">
-              The agent’s evidence gate keeps it flat until a symbol demonstrates an edge — so out of the box, it trades
-              nothing. That is the correct behaviour, and you can switch it off to watch orders land on testnet.
+          <div className="border-t border-white/[0.06] px-7 py-6 sm:px-9">
+            <p className="max-w-3xl text-[14px] leading-relaxed text-slate-400">
+              So out of the box, the bot trades nothing at all. It stays out until a market proves itself worth trading.
+              That is the correct behaviour — and you can turn it off to watch practice orders go through.
             </p>
           </div>
         </div>
@@ -376,33 +372,56 @@ function Evidence() {
 
 function Safety() {
   return (
-    <section className="px-4 py-16 sm:px-6">
-      <div className="mx-auto grid max-w-6xl gap-4 md:grid-cols-3">
-        {[
-          {
-            icon: Lock,
-            title: 'Keys never reach the browser',
-            body: 'Delta orders are HMAC-signed in the backend process. The API secret is not in the bundle, and the browser cannot reach Delta’s private endpoints at all.',
-          },
-          {
-            icon: ShieldCheck,
-            title: 'Live mode needs two switches',
-            body: 'DELTA_ENV=live and DELTA_ALLOW_LIVE=true, both set deliberately. One alone silently falls back to testnet, so a typo cannot start moving real funds.',
-          },
-          {
-            icon: Bot,
-            title: 'Server-side caps and a kill switch',
-            body: 'Per-order notional limits and a hard stop are enforced in the backend, where the client cannot edit them. Guards the browser can change are not guards.',
-          },
-        ].map(({ icon: Icon, title, body }, i) => (
-          <Reveal as="article" key={title} delay={i * 80} className="card card-hover p-5">
-            <span className="grid h-9 w-9 place-items-center rounded-xl border border-emerald-500/25 bg-emerald-500/10">
-              <Icon size={17} className="text-emerald-300" />
-            </span>
-            <h3 className="mt-4 text-base font-semibold text-white">{title}</h3>
-            <p className="mt-2 text-sm leading-relaxed text-slate-400">{body}</p>
-          </Reveal>
-        ))}
+    <section className="px-5 py-24 sm:px-8 sm:py-28">
+      <div className="mx-auto max-w-6xl">
+        <SectionHead eyebrow="Safety" title="Why it can’t spend your money by accident" align="center" />
+        <div className="mt-14 grid gap-5 md:grid-cols-3">
+          {[
+            {
+              icon: Lock,
+              title: 'Your keys stay on the server',
+              body: 'Exchange keys never reach your browser. Nothing in the page can reach your account, even if someone tampered with it.',
+            },
+            {
+              icon: ShieldCheck,
+              title: 'Real trading needs two switches',
+              body: 'Both must be turned on deliberately. If only one is set, the app quietly stays in practice mode — so a typo can never spend real money.',
+            },
+            {
+              icon: Bot,
+              title: 'Limits you cannot edit',
+              body: 'Order size caps and an emergency stop live on the server. Limits the browser can change are not really limits.',
+            },
+          ].map(({ icon: Icon, title, body }, i) => (
+            <Reveal as="article" key={title} delay={i * 80} className="card card-hover p-6">
+              <span className="grid h-11 w-11 place-items-center rounded-xl border border-emerald-500/20 bg-emerald-500/[0.08]">
+                <Icon size={18} className="text-emerald-300" />
+              </span>
+              <h3 className="mt-5 text-[17px] font-semibold tracking-tight text-white">{title}</h3>
+              <p className="mt-2.5 text-[14px] leading-relaxed text-slate-400">{body}</p>
+            </Reveal>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function Closing() {
+  return (
+    <section className="px-5 pb-28 sm:px-8">
+      <div className="mx-auto max-w-3xl text-center">
+        <h2 className="text-3xl font-semibold leading-tight tracking-tight text-white sm:text-[2.75rem]">
+          Try it with nothing on the line
+        </h2>
+        <p className="mx-auto mt-5 max-w-lg text-[15px] leading-relaxed text-slate-400">
+          The practice account starts with fake money and live prices. Watch it think, and watch it decide not to trade.
+        </p>
+        <div className="mt-9 flex justify-center">
+          {/* Full width on a phone, matching the hero's button — a narrow
+              button under a full-width one reads as a different action. */}
+          <LaunchButton className="btn-primary w-full px-7 py-3.5 text-base sm:w-auto" />
+        </div>
       </div>
     </section>
   )
@@ -421,7 +440,7 @@ export default function Landing() {
   // answers. HEADER_H keeps the swap in step with the sticky bar's height, so
   // the hero button is considered gone once it slides under it.
   useEffect(() => {
-    const HEADER_H = 64
+    const HEADER_H = 68
     const el = heroCtaRef.current
     if (!el) return
 
@@ -445,17 +464,16 @@ export default function Landing() {
         <Pipeline />
         <Evidence />
         <Safety />
+        <Closing />
       </main>
 
-      <footer className="border-t border-white/[0.07] px-4 py-8 sm:px-6">
+      <footer className="border-t border-white/[0.06] px-5 py-10 sm:px-8">
         <div className="mx-auto flex max-w-6xl flex-col gap-4 text-xs text-slate-600 sm:flex-row sm:items-center">
-          <p>VentureDAO · AI-powered decentralised investment intelligence</p>
-          <p className="sm:ml-auto">
-            Not investment advice. Markets are uncertain and the target is a goal, not a guarantee.
-          </p>
+          <p>Venture DAO</p>
+          <p className="sm:ml-auto">Not financial advice. Markets are uncertain and no target is a promise.</p>
           <span className="hidden items-center gap-1.5 sm:flex">
             <Code2 size={13} />
-            Built with React, Gemini &amp; Ethereum
+            Built with React
           </span>
         </div>
       </footer>

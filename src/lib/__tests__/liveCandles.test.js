@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { INTERVAL_MS, mergeLiveCandle } from '../liveCandles'
+import { INTERVAL_MS, mergeLiveCandle } from '../market/liveCandles'
 
 const MIN = INTERVAL_MS['1m']
 const base = (time) => ({ time, open: 100, high: 105, low: 95, close: 102, volume: 7 })

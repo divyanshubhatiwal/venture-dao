@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { AlertTriangle, CheckCircle2, Loader2, OctagonX, RefreshCw, ServerCog, ShieldCheck, XCircle } from 'lucide-react'
 import { Card, Chip, SectionTitle } from './ui'
-import { deltaVenue } from '../lib/venues'
+import { deltaVenue } from '../lib/trading/venues'
 
 const tone = {
   emerald: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
@@ -69,7 +69,7 @@ export default function DeltaStatus() {
           </p>
           <p className="mt-1.5 text-[11px] leading-relaxed text-slate-500">
             Start it with <code className="rounded bg-black/40 px-1 font-mono">npm run server</code>. Until then the agent keeps
-            using the paper venue.
+            using the practice account.
           </p>
         </div>
       )}

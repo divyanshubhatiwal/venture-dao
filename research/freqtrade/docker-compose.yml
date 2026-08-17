@@ -1,0 +1,22 @@
+# Freqtrade as a research tool — backtesting and hyperopt only.
+#
+# This is NOT part of the application. It never trades, never holds a key, and
+# nothing in src/ or server/ imports from it. Its whole job is to answer one
+# question the app cannot currently answer for itself: does any strategy here
+# have an edge that survives out-of-sample testing?
+#
+# Freqtrade is GPL-3.0. It runs here as a separate container reached only by
+# the command line, so it imposes no licence obligation on the application.
+# Findings come back as numbers and ideas; its code does not.
+services:
+  freqtrade:
+    image: freqtradeorg/freqtrade:stable
+    container_name: vd-freqtrade-research
+    volumes:
+      - ./user_data:/freqtrade/user_data
+      - ./config.json:/freqtrade/config.json:ro
+    # No ports published. A research container has no reason to listen, and an
+    # exposed API is one more thing that can be reached by something else.
+    # No environment block: there are no credentials to pass.
+    entrypoint: ['freqtrade']
+    command: ['--help']

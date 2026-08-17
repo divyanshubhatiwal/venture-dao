@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { REASONS, summariseBlockers } from '../botReasons'
+import { REASONS, summariseBlockers } from '../agent/botReasons'
 
 describe('summariseBlockers', () => {
   it('returns nothing when the bot has not declined anything', () => {

@@ -1,6 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { Bar, BarChart, CartesianGrid, Cell, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { atr, bollinger, ema, macd, rsi, sma } from '../lib/indicators'
+import { atr, bollinger, ema, macd, rsi, sma } from '../lib/trading/indicators'
 
 const UP = '#34d399'
 const DOWN = '#fb7185'

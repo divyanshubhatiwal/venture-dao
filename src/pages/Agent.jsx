@@ -21,19 +21,19 @@ import {
 import { Card, ChartTooltip, Chip, PageHeader, SectionTitle, Skeleton } from '../components/ui'
 import LiveValue from '../components/LiveValue'
 import DeltaStatus from '../components/DeltaStatus'
-import { deltaTradable } from '../lib/venues'
+import { deltaTradable } from '../lib/trading/venues'
 import { useTrading } from '../context/TradingContext'
 import { useMarket } from '../context/MarketContext'
 import { useDemo } from '../context/DemoContext'
 import { useToast } from '../context/ToastContext'
-import { getCandles } from '../lib/marketApi'
-import { getStockCandles } from '../lib/stockApi'
-import { getMacro } from '../lib/macro'
+import { getCandles } from '../lib/market/marketApi'
+import { getStockCandles } from '../lib/market/stockApi'
+import { getMacro } from '../lib/market/macro'
 import { DEFAULT_GOAL_CONFIG, computeGoalState, computeStreaks, normaliseConfig } from '../lib/agent/goalManager'
 import { decide, formatDecision } from '../lib/agent/decision'
 import { monteCarlo } from '../lib/agent/monteCarlo'
-import { backtest } from '../lib/backtest'
-import { publishBotStatus } from '../lib/botStatus'
+import { backtest } from '../lib/trading/backtest'
+import { publishBotStatus } from '../lib/agent/botStatus'
 
 const UNIVERSE = [
   { symbol: 'ETH', assetClass: 'crypto' },
@@ -147,7 +147,7 @@ export default function Agent() {
     }
   }, [])
 
-  // The agent's account is the paper account, rebased onto the goal's scale.
+  // The agent's account is the practice account, rebased onto the goal's scale.
   const balance = useMemo(() => {
     const ratio = trading.equity / (trading.startingCash || 1)
     return +(config.startingBalance * ratio).toFixed(2)
@@ -206,7 +206,7 @@ export default function Agent() {
           toast({
             tone: 'warning',
             title: `${actionable.symbol} is not on Delta`,
-            description: 'Routed to the paper venue instead. Delta lists ETH, BTC and SOL perpetuals.',
+            description: 'Routed to the practice account instead. Delta lists ETH, BTC and SOL perpetuals.',
           })
         }
 
@@ -226,7 +226,7 @@ export default function Agent() {
           title: `${actionable.action} ${actionable.symbol}`,
           description: useDelta
             ? `${receipt.contracts ?? '?'} contracts on Delta ${receipt.environment} · order ${receipt.orderId ?? 'n/a'}`
-            : `${actionable.riskPercent}% risk · EV ${actionable.expectedValue?.evR}R · paper account`,
+            : `${actionable.riskPercent}% risk · EV ${actionable.expectedValue?.evR}R · practice account`,
         })
       }
     } catch (err) {
@@ -317,9 +317,9 @@ export default function Agent() {
   return (
     <div className="animate-fade-up">
       <PageHeader
-        eyebrow="Autonomous agent · paper account"
-        title="Goal-Based Trading Agent"
-        subtitle="Capital protection first, target second. The risk engine runs last and can veto anything the model wants to do."
+        eyebrow="Practice account"
+        title="Trading bot"
+        subtitle="Protecting your money comes first, profit second. The safety checks run last and can cancel any trade."
         actions={
           <>
             {regime && (
@@ -350,22 +350,22 @@ export default function Agent() {
         <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-400" />
         <p className="text-xs leading-relaxed text-amber-100/80">
           <span className="font-semibold text-amber-100">The target is a goal, not a guarantee.</span> Markets are uncertain: the
-          balance can fall, the target may never be reached, and the drawdown limit can halt trading permanently. Everything here
-          runs on a paper account with virtual money.
+          balance can fall, the target may never be reached, and the loss from peak limit can halt trading permanently. Everything here
+          runs on a practice account with virtual money.
         </p>
       </div>
 
       {/* Goal + state */}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <Card className="p-5 xl:col-span-2" data-demo="goal">
-          <SectionTitle icon={Target} title="Goal progress" hint="Balance, peak and the protected floor on one scale" />
+          <SectionTitle icon={Target} title="Progress to your goal" hint="Balance, peak and the protected floor on one scale" />
           <GoalBar goalState={goalState} />
 
           <div className="mt-5 grid grid-cols-2 gap-4 border-t border-white/[0.06] pt-4 sm:grid-cols-4">
             {[
               ['Profit', money(goalState.profit), goalState.profit >= 0 ? 'text-emerald-400' : 'text-rose-400'],
               ['Peak', money(goalState.peakBalance), 'text-slate-100'],
-              ['Drawdown', `${goalState.drawdownFromPeak}%`, goalState.drawdownFromPeak > 0 ? 'text-amber-400' : 'text-slate-100'],
+              ['Loss from peak', `${goalState.drawdownFromPeak}%`, goalState.drawdownFromPeak > 0 ? 'text-amber-400' : 'text-slate-100'],
               ['Floor', goalState.protectedFloor != null ? money(goalState.protectedFloor) : 'inactive', 'text-emerald-300'],
             ].map(([label, value, cls]) => (
               <div key={label}>
@@ -377,7 +377,7 @@ export default function Agent() {
         </Card>
 
         <Card className="p-5">
-          <SectionTitle icon={Gauge} title="Account state" />
+          <SectionTitle icon={Gauge} title="Your account" />
           {!state ? (
             <p className="py-6 text-center text-[11px] text-slate-600">Run a cycle to derive the state.</p>
           ) : (
@@ -409,7 +409,7 @@ export default function Agent() {
           <SectionTitle
             icon={Bot}
             title="Latest decision"
-            hint="Signal → critic → risk engine, in that order"
+            hint="Find it → challenge it → check the limits, in that order"
             action={
               thinking ? (
                 <span className="flex items-center gap-1.5 text-[11px] text-slate-500">
@@ -530,7 +530,7 @@ export default function Agent() {
         {/* Controls */}
         <div className="space-y-4">
           <Card className="p-5">
-            <SectionTitle icon={ShieldCheck} title="Agent control" />
+            <SectionTitle icon={ShieldCheck} title="Start and stop" />
             <button
               onClick={() => {
                 if (stopped) return
@@ -567,7 +567,7 @@ export default function Agent() {
           </Card>
 
           <Card className="p-5">
-            <SectionTitle icon={ServerCog} title="Execution venue" hint="Where the agent's orders go" />
+            <SectionTitle icon={ServerCog} title="Where trades go" hint="Where the agent's orders go" />
             <div className="grid grid-cols-2 gap-2">
               {[
                 { id: 'paper', label: 'Paper', note: 'Internal simulator' },
@@ -597,12 +597,12 @@ export default function Agent() {
           <DeltaStatus />
 
           <Card className="p-5">
-            <SectionTitle icon={Target} title="Goal configuration" />
+            <SectionTitle icon={Target} title="Your goal" />
             <form onSubmit={applyConfig} className="space-y-3">
               {[
                 ['Starting capital', 'startingBalance', 1],
                 ['Target balance', 'targetBalance', 1],
-                ['Max drawdown %', 'maxDrawdownPercent', 0.5],
+                ['Max loss from peak %', 'maxDrawdownPercent', 0.5],
                 ['Risk per trade %', 'riskPerTradePercent', 0.05],
                 ['Daily loss limit %', 'dailyLossLimitPercent', 0.25],
                 ['Min risk/reward', 'minRiskReward', 0.1],
@@ -630,7 +630,7 @@ export default function Agent() {
       <Card className="mt-4 p-5">
         <SectionTitle
           icon={Gauge}
-          title="Monte Carlo — will this reach the goal?"
+          title="Will this actually reach your goal?"
           hint="2,000 runs resampling the strategy's own trades in random order"
           action={
             <button onClick={runMonteCarlo} disabled={mcRunning} className="btn-ghost btn-sm">
@@ -653,9 +653,9 @@ export default function Agent() {
                   `${mc.probabilityOfTarget}%`,
                   mc.probabilityOfTarget > 50 ? 'text-emerald-400' : 'text-rose-400',
                 ],
-                ['Hits drawdown stop', `${mc.probabilityOfDrawdownStop}%`, mc.probabilityOfDrawdownStop > 50 ? 'text-rose-400' : 'text-emerald-400'],
+                ['Hits loss from peak stop', `${mc.probabilityOfDrawdownStop}%`, mc.probabilityOfDrawdownStop > 50 ? 'text-rose-400' : 'text-emerald-400'],
                 ['Median outcome', money(mc.median), mc.median >= config.startingBalance ? 'text-emerald-400' : 'text-rose-400'],
-                ['Median max drawdown', `${mc.medianMaxDrawdown}%`, 'text-amber-400'],
+                ['Median max loss from peak', `${mc.medianMaxDrawdown}%`, 'text-amber-400'],
               ].map(([label, value, cls]) => (
                 <div key={label}>
                   <p className="label">{label}</p>
@@ -703,8 +703,8 @@ export default function Agent() {
               }`}
             >
               {mc.probabilityOfTarget === 0
-                ? `Across ${mc.runs.toLocaleString()} runs resampled from ${mc.sampleTrades} real trades, the account reached ${money(config.targetBalance, 0)} zero times and hit the drawdown stop in ${mc.probabilityOfDrawdownStop}% of them. On this evidence the goal is not reachable with this strategy — the answer is to find an edge, not to raise the risk.`
-                : `Reached the target in ${mc.probabilityOfTarget}% of ${mc.runs.toLocaleString()} runs, with a median max drawdown of ${mc.medianMaxDrawdown}%. The trade outcomes are real; only their order is simulated. Future trades can still be worse than anything drawn here.`}
+                ? `Across ${mc.runs.toLocaleString()} runs resampled from ${mc.sampleTrades} real trades, the account reached ${money(config.targetBalance, 0)} zero times and hit the loss from peak stop in ${mc.probabilityOfDrawdownStop}% of them. On this evidence the goal is not reachable with this strategy — the answer is to find an edge, not to raise the risk.`
+                : `Reached the target in ${mc.probabilityOfTarget}% of ${mc.runs.toLocaleString()} runs, with a median max loss from peak of ${mc.medianMaxDrawdown}%. The trade outcomes are real; only their order is simulated. Future trades can still be worse than anything drawn here.`}
             </p>
           </>
         )}
@@ -713,7 +713,7 @@ export default function Agent() {
       {/* Equity + journal */}
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
         <Card className="p-5">
-          <SectionTitle icon={Gauge} title="Equity curve" hint="Rebased to the goal scale" />
+          <SectionTitle icon={Gauge} title="Account value over time" hint="Rebased to the goal scale" />
           <div className="h-40">
             {equityCurve.length > 1 ? (
               <ResponsiveContainer width="100%" height="100%">
@@ -738,7 +738,7 @@ export default function Agent() {
 
         <Card className="overflow-hidden p-0 xl:col-span-2">
           <div className="p-5 pb-3">
-            <SectionTitle icon={Bot} title="Decision journal" hint="Every evaluation, including the ones that traded nothing" />
+            <SectionTitle icon={Bot} title="What it decided, and why" hint="Every evaluation, including the ones that traded nothing" />
           </div>
           {decisions.length === 0 ? (
             <p className="px-5 pb-6 text-center text-xs text-slate-600">Decisions appear here as cycles run.</p>
@@ -766,7 +766,7 @@ export default function Agent() {
       {/* Full decision record */}
       {latest && (
         <Card className="mt-4 p-5">
-          <SectionTitle icon={Bot} title="Decision record" hint="The full audit format" />
+          <SectionTitle icon={Bot} title="What it decided" hint="The full audit format" />
           <pre className="overflow-x-auto rounded-lg border border-white/[0.06] bg-black/30 p-4 font-mono text-[11px] leading-relaxed text-slate-300">
             {formatDecision(latest)}
           </pre>

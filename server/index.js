@@ -1,7 +1,25 @@
 import express from 'express'
 import cors from 'cors'
 import 'dotenv/config'
-import { botStatus, getBot } from './botService.js'
+import {
+  COOKIE_NAME,
+  clearCookie,
+  login as authLogin,
+  parseCookies,
+  publicUser,
+  register as authRegister,
+  resolveSession,
+  revokeSession,
+  issueSession,
+  sessionCookie,
+} from './identity/auth.js'
+import { purgeExpiredSessions } from './storage/db.js'
+import { connectMongo, mongoDbName, mongoUri } from './storage/mongo.js'
+import { KYC_STATUS, isKycApproved, publicKyc, getRawKyc, recordLiveness, reviewKyc, submitKyc } from './identity/kyc.js'
+import { issueChallenge, purgeExpiredChallenges, verifyChallenge } from './identity/kycVideo.js'
+import { botStatus, getBot, measureStopDistances } from './trading/botService.js'
+import { suggestConfig } from './trading/suggestConfig.js'
+import { getMarketNews } from './market/news.js'
 import {
   cancelOrder,
   getBalances,
@@ -11,7 +29,7 @@ import {
   getTicker,
   placeOrder,
   resolveConfig,
-} from './delta.js'
+} from './trading/delta.js'
 
 /**
  * VentureDAO backend.
@@ -26,7 +44,9 @@ import {
 
 const app = express()
 app.use(express.json({ limit: '256kb' }))
-app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:5173' }))
+// credentials:true is required for the session cookie to travel; with it, the
+// origin must be explicit — a wildcard origin and cookies are incompatible.
+app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:5173', credentials: true }))
 
 const PORT = Number(process.env.PORT || 5000)
 
@@ -39,6 +59,178 @@ const asHandler = (fn) => async (req, res) => {
     res.status(status).json({ ok: false, error: err.message, code: err.code ?? null, details: err.details ?? null })
   }
 }
+
+/**
+ * Attach the signed-in user, if any, to every request.
+ *
+ * The identity comes from the session cookie and a database lookup — never
+ * from anything the client asserts. A userId in a request body is a claim, not
+ * a fact, and this is the only place the app is allowed to decide who is
+ * calling.
+ */
+app.use(async (req, _res, next) => {
+  const token = parseCookies(req.headers.cookie)[COOKIE_NAME]
+  req.sessionToken = token ?? null
+  try {
+    req.user = token ? publicUser(await resolveSession(token)) : null
+    next()
+  } catch (err) {
+    // A database that is down must not be reported as "signed out" — that
+    // sends people to re-enter a password that was never the problem.
+    next(err)
+  }
+})
+
+/** Guard for anything that must not be reachable anonymously. */
+const requireAuth = (req, res, next) => {
+  if (!req.user) return res.status(401).json({ ok: false, error: 'Sign in to continue.' })
+  next()
+}
+
+/**
+ * Login throttle.
+ *
+ * Password checks are deliberately slow, so an unthrottled login form is both
+ * a guessing oracle and a cheap way to pin the CPU. Keyed by IP and email
+ * together: keying on IP alone lets one attacker lock out a shared office,
+ * and on email alone lets anyone lock a victim out of their own account.
+ */
+const attempts = new Map()
+const MAX_ATTEMPTS = 8
+const WINDOW_MS = 10 * 60_000
+
+function throttle(req, res, next) {
+  const key = `${req.ip}|${String(req.body?.email ?? '').toLowerCase()}`
+  const now = Date.now()
+  const entry = attempts.get(key)
+  if (entry && now - entry.first > WINDOW_MS) attempts.delete(key)
+
+  const current = attempts.get(key)
+  if (current && current.count >= MAX_ATTEMPTS) {
+    const waitSeconds = Math.ceil((WINDOW_MS - (now - current.first)) / 1000)
+    return res.status(429).json({ ok: false, error: `Too many attempts. Try again in ${waitSeconds}s.` })
+  }
+  req.recordFailure = () => {
+    const existing = attempts.get(key)
+    attempts.set(key, existing ? { ...existing, count: existing.count + 1 } : { first: now, count: 1 })
+  }
+  req.clearFailures = () => attempts.delete(key)
+  next()
+}
+
+/* ---------- authentication ---------- */
+
+app.post(
+  '/api/auth/register',
+  asHandler(async (req) => {
+    const user = await authRegister({ email: req.body?.email, password: req.body?.password, name: req.body?.name })
+    const { token, expiresAt } = await issueSession(user.id, { userAgent: req.headers['user-agent'] ?? null })
+    req.res.setHeader('Set-Cookie', sessionCookie(token, { expiresAt }))
+    return { user }
+  }),
+)
+
+app.post('/api/auth/login', throttle, async (req, res, next) => {
+  try {
+  const user = await authLogin({ email: req.body?.email, password: req.body?.password })
+  if (!user) {
+    req.recordFailure()
+    // One message for a wrong password and an unknown email alike; saying
+    // which would turn this form into an account-discovery tool.
+    return res.status(401).json({ ok: false, error: 'Email or password is incorrect.' })
+  }
+  req.clearFailures()
+  const { token, expiresAt } = await issueSession(user.id, { userAgent: req.headers['user-agent'] ?? null })
+  res.setHeader('Set-Cookie', sessionCookie(token, { expiresAt }))
+  res.json({ ok: true, data: { user } })
+  } catch (err) {
+    next(err)
+  }
+})
+
+app.post('/api/auth/logout', async (req, res) => {
+  await revokeSession(req.sessionToken)
+  res.setHeader('Set-Cookie', clearCookie())
+  res.json({ ok: true, data: { ok: true } })
+})
+
+/** Who am I? Answers null rather than 401 so the UI can ask on every load. */
+app.get('/api/auth/me', (req, res) => res.json({ ok: true, data: { user: req.user } }))
+
+/* ---------- KYC ----------
+   Identity records are per-user and every route is behind requireAuth; the
+   owner is taken from the session, never from the request body. */
+
+app.get('/api/kyc', requireAuth, asHandler(async (req) => publicKyc(await getRawKyc(req.user.id))))
+
+app.post(
+  '/api/kyc',
+  requireAuth,
+  asHandler((req) =>
+    submitKyc({
+      userId: req.user.id,
+      fullName: req.body?.fullName,
+      dob: req.body?.dob,
+      pan: req.body?.pan,
+      address: req.body?.address,
+    }),
+  ),
+)
+
+/**
+ * Review a submission.
+ *
+ * Guarded by an operator token from the environment rather than a user role,
+ * because there is no admin model yet and inventing one that any signed-in user
+ * could reach would be worse than none. Without KYC_REVIEW_TOKEN set, nothing
+ * can be approved — which is the correct default for an app that cannot
+ * actually verify an identity.
+ */
+app.post(
+  '/api/kyc/review',
+  asHandler((req) => {
+    const expected = process.env.KYC_REVIEW_TOKEN
+    if (!expected) {
+      throw Object.assign(new Error('Review is disabled: KYC_REVIEW_TOKEN is not configured.'), { status: 503 })
+    }
+    if (req.headers['x-review-token'] !== expected) {
+      throw Object.assign(new Error('Not authorised to review submissions.'), { status: 403 })
+    }
+    return reviewKyc({
+      userId: req.body?.userId,
+      approve: Boolean(req.body?.approve),
+      reason: req.body?.reason ?? null,
+      reviewedBy: 'operator',
+    })
+  }),
+)
+
+/**
+ * Video liveness. The prompts are issued here and expire in minutes, so a clip
+ * recorded earlier cannot contain the right answers.
+ */
+app.post('/api/kyc/video/challenge', requireAuth, asHandler((req) => issueChallenge(req.user.id)))
+
+app.post(
+  '/api/kyc/video/complete',
+  requireAuth,
+  asHandler((req) => {
+    const result = verifyChallenge({
+      nonce: req.body?.nonce,
+      userId: req.user.id,
+      completedPrompts: req.body?.completedPrompts,
+      durationMs: Number(req.body?.durationMs),
+      motionScore: Number(req.body?.motionScore),
+    })
+    if (!result.ok) throw Object.assign(new Error(result.reason), { status: 400 })
+    // Advances liveness, never status. Only a reviewer can approve an identity.
+    return recordLiveness({ userId: req.user.id, note: result.note })
+  }),
+)
+
+/* Publishers send no CORS headers on their RSS, so this cannot run in the
+   browser; the cache in news.js also keeps a busy page from hammering them. */
+app.get('/api/news/markets', asHandler(() => getMarketNews()))
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'venturedao-backend', at: new Date().toISOString() }))
 
@@ -278,12 +470,58 @@ app.put(
   }),
 )
 
-app.listen(PORT, () => {
+/**
+ * Settings derived from what the market is currently doing.
+ *
+ * Read-only: it proposes, the operator applies. Auto-writing risk limits from
+ * a background measurement would mean the numbers guarding the account could
+ * change without anyone deciding to change them.
+ */
+app.get(
+  '/api/bot/suggest',
+  asHandler(async (req) => {
+    const { config } = getBot()
+    const maxPositionPercent = Number(req.query?.maxPositionPercent ?? config.maxPositionPercent ?? 15)
+    const stopPercents = await measureStopDistances()
+    return suggestConfig({
+      stopPercents,
+      equity: config.startingBalance,
+      maxPositionPercent,
+      maxTradesPerDay: config.maxTradesPerDay,
+      maxOpenPositions: config.maxOpenPositions,
+    })
+  }),
+)
+
+// Expired rows are deleted rather than left to accumulate; an expired session
+// is already refused on lookup, this just stops the table growing forever.
+setInterval(() => {
+  // Rejected rather than left unhandled: a failed sweep must not take the
+  // process down an hour after boot.
+  purgeExpiredSessions().catch((err) => console.error('  session purge failed:', err.message))
+}, 60 * 60_000).unref?.()
+setInterval(() => purgeExpiredChallenges(), 5 * 60_000).unref?.()
+
+await connectMongo()
+  .then(() => app.listen(PORT, onListening))
+  .catch((err) => {
+    // Refusing to start is the honest outcome. A server that boots without its
+    // database answers every sign-in with a 500 and looks like a broken app.
+    console.error(`
+  ✗ ${err.message}
+`)
+    process.exit(1)
+  })
+
+function onListening() {
   const config = resolveConfig()
   console.log(`\n  VentureDAO backend  →  http://localhost:${PORT}`)
   console.log(`  Delta environment   →  ${config.environment.name.toUpperCase()} (${config.environment.baseUrl})`)
   console.log(`  Credentials         →  ${config.hasCredentials ? `loaded (…${config.apiKey.slice(-4)})` : 'NOT SET — public routes only'}`)
   console.log(`  Max order notional  →  ${config.maxOrderNotional}`)
+  // Credentials stripped: a connection string is printed at every boot and
+  // ends up in logs and screen shares.
+  console.log(`  MongoDB             →  ${mongoUri().replace(/\/\/[^@]*@/, '//***@')} · db "${mongoDbName()}"`)
   if (config.downgraded) {
     console.log('\n  ⚠  DELTA_ENV=live was requested but DELTA_ALLOW_LIVE is not "true".')
     console.log('     Falling back to TESTNET. Live trading needs both switches set deliberately.')
@@ -293,4 +531,4 @@ app.listen(PORT, () => {
   } else {
     console.log('  Mode                →  testnet, virtual funds\n')
   }
-})
+}

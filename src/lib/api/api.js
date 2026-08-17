@@ -12,7 +12,7 @@ import {
   SECTOR_ALLOCATION,
   SCORING_WEIGHTS,
   mockChatReply,
-} from './mockData.js'
+} from '../demo/mockData.js'
 
 const BASE_URL = import.meta.env?.VITE_API_URL || ''
 /** Set VITE_USE_MOCKS=false once the Express backend is running. */

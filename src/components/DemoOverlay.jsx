@@ -1,6 +1,6 @@
 import { ChevronLeft, ChevronRight, Loader2, Pause, Play, Presentation, X } from 'lucide-react'
 import { useDemo } from '../context/DemoContext'
-import { DEMO_STEPS } from '../lib/demoScript'
+import { DEMO_STEPS } from '../lib/demo/demoScript'
 
 /** Entry point for the walkthrough — lives in the top bar. */
 export function DemoLaunchButton() {

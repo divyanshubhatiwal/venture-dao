@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AlertTriangle, CheckCircle2, HelpCircle, Loader2, OctagonX, Pause, Play, RotateCw } from 'lucide-react'
-import { botApi } from '../lib/botApi'
-import { summariseBlockers } from '../lib/botReasons'
+import { AlertTriangle, CheckCircle2, HelpCircle, Loader2, OctagonX, Pause, Play, RotateCw, Wand2 } from 'lucide-react'
+import { botApi, subscribeBotStatus } from '../lib/api/botApi'
+import { summariseBlockers } from '../lib/agent/botReasons'
+import PositionMonitor from './PositionMonitor'
 
 const STATE_TONE = {
   STOPPED: 'border-white/10 bg-white/[0.04] text-slate-400',
@@ -59,6 +60,7 @@ export default function BotControlPanel() {
   const [busy, setBusy] = useState(null)
   const [error, setError] = useState(null)
   const [draft, setDraft] = useState(null)
+  const [suggestion, setSuggestion] = useState(null)
   const alive = useRef(true)
 
   useEffect(() => {
@@ -89,17 +91,15 @@ export default function BotControlPanel() {
     [apply],
   )
 
-  useEffect(() => {
-    let timer
-    const poll = () =>
-      botApi
-        .status()
-        .then(apply)
-        .catch((err) => alive.current && setError(err.message))
-    poll()
-    timer = setInterval(poll, 5000)
-    return () => clearInterval(timer)
-  }, [apply])
+  // Shared poller: one request serves every component that needs bot status.
+  useEffect(
+    () =>
+      subscribeBotStatus((next, err) => {
+        if (err) setError(err.message)
+        else apply(next)
+      }),
+    [apply],
+  )
 
   if (!status) {
     return (
@@ -201,6 +201,13 @@ export default function BotControlPanel() {
         ))}
       </dl>
 
+      {/* Live positions with their protective levels */}
+      {status.positions?.length > 0 && (
+        <div className="border-b border-white/[0.06]">
+          <PositionMonitor positions={status.positions} monitorSeconds={5} />
+        </div>
+      )}
+
       {/* Daily session */}
       {status.session && status.progress && (
         <div className="border-b border-white/[0.06] px-4 py-3">
@@ -223,20 +230,41 @@ export default function BotControlPanel() {
             )}
           </p>
 
-          {/* Progress toward the daily objective. Realised only — an unrealised
-              gain can evaporate, so it must not read as target achieved. */}
+          {/* Two figures, because there are genuinely two.
+              Solid bar = money actually banked, which is what decides whether
+              the day's target is reached. Lighter bar ahead of it = profit
+              currently open. Showing only the first made an account sitting on
+              an open gain read as zero progress, while an open loss moved the
+              loss limit straight away — the same money reported in one
+              direction only. */}
           <div className="mt-3 flex items-baseline justify-between">
             <span className="text-[11px] text-slate-500">Daily target</span>
             <span className="num text-[11px] font-semibold text-slate-100">
               {money(status.progress.realisedPnl)} / {money(status.progress.targetAmount)}
             </span>
           </div>
-          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/[0.07]">
+          <div className="relative mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/[0.07]">
+            {/* Open profit sits underneath, so the banked bar always paints over it. */}
             <div
-              className={`h-full rounded-full ${status.progress.lossLimitHit ? 'bg-rose-400' : status.progress.targetReached ? 'bg-emerald-400' : 'bg-brand-400'}`}
+              className="absolute inset-y-0 left-0 rounded-full bg-brand-400/30"
+              style={{ width: `${Math.min(100, Math.max(0, status.progress.netAchievedPercent ?? 0))}%` }}
+            />
+            <div
+              className={`absolute inset-y-0 left-0 rounded-full ${status.progress.lossLimitHit ? 'bg-rose-400' : status.progress.targetReached ? 'bg-emerald-400' : 'bg-brand-400'}`}
               style={{ width: `${Math.min(100, Math.max(0, status.progress.targetAchievedPercent))}%` }}
             />
           </div>
+          {/* Named so the gap between the two bars is explained rather than puzzling. */}
+          {status.progress.unrealisedPnl !== 0 && (
+            <p className="mt-1.5 text-[10px] text-slate-500">
+              {money(status.progress.realisedPnl)} banked
+              <span className={status.progress.unrealisedPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
+                {' · '}
+                {status.progress.unrealisedPnl >= 0 ? '+' : ''}
+                {money(status.progress.unrealisedPnl)} still open
+              </span>
+            </p>
+          )}
           <dl className="mt-2 grid grid-cols-2 gap-x-4">
             {[
               ['Unrealised', money(status.progress.unrealisedPnl)],
@@ -269,7 +297,7 @@ export default function BotControlPanel() {
               ['Fees', money(-status.report.fees)],
               ['Net', money(status.report.netPnl)],
               ['Target hit', `${status.report.targetAchievedPercent}%`],
-              ['Max drawdown', `${status.report.maxDrawdownPercent}%`],
+              ['Max loss from peak', `${status.report.maxDrawdownPercent}%`],
             ].map(([k, v]) => (
               <div key={k} className="flex items-center justify-between py-0.5">
                 <dt className="text-[10px] text-slate-500">{k}</dt>
@@ -301,6 +329,46 @@ export default function BotControlPanel() {
           </label>
         ))}
       </div>
+      {/* Settings measured from the market rather than guessed.
+          It fills the form; applying is still a deliberate act. */}
+      <div className="px-4 pb-2">
+        <button
+          onClick={async () => {
+            setBusy('suggest')
+            setError(null)
+            try {
+              const s = await botApi.suggest()
+              if (!s.ok) throw new Error(s.reason)
+              setSuggestion(s)
+              setDraft((d) => ({ ...(d ?? status.config), ...s.config }))
+            } catch (err) {
+              setError(err.message)
+            } finally {
+              setBusy(null)
+            }
+          }}
+          disabled={busy || status.running}
+          className="btn-ghost btn-sm w-full justify-center py-2 disabled:opacity-40"
+        >
+          {busy === 'suggest' ? <Loader2 size={13} className="animate-spin" /> : <Wand2 size={13} />}
+          Fill from market
+        </button>
+        {suggestion?.ok && (
+          <div className="mt-2 rounded-xl border border-white/10 bg-white/[0.03] p-2.5">
+            <p className="text-[10px] leading-relaxed text-slate-400">
+              Stops are averaging <span className="num text-slate-200">{suggestion.measured.medianStopPercent}%</span> from entry across{' '}
+              {suggestion.measured.markets} markets, so risk is set to{' '}
+              <span className="num text-slate-200">{suggestion.config.riskPerTradePercent}%</span> to keep positions inside your cap.
+            </p>
+            <p className="mt-1.5 text-[10px] leading-relaxed text-slate-500">
+              Perfect day <span className="num">{suggestion.expectation.perfectDayPercent}%</span> · expected{' '}
+              <span className="num">{suggestion.expectation.expectedPercent}%</span> at a 40% win rate. Derived from current
+              volatility, not a forecast.
+            </p>
+          </div>
+        )}
+      </div>
+
       <div className="px-4 pb-3">
         <button
           onClick={() => run('config', () => botApi.updateConfig(draft))}

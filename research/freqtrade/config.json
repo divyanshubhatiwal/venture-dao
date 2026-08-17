@@ -1,0 +1,62 @@
+{
+  "$comment": [
+    "Research configuration. Dry-run only, no credentials, no live keys.",
+    "The exchange block exists solely so Freqtrade can download public candles;",
+    "backtesting and hyperopt never authenticate. Leave key and secret empty —",
+    "if this file ever needs a real key, something has gone wrong."
+  ],
+  "max_open_trades": 3,
+  "stake_currency": "USDT",
+  "stake_amount": 1000,
+  "tradable_balance_ratio": 0.99,
+  "fiat_display_currency": "INR",
+  "dry_run": true,
+  "dry_run_wallet": 100000,
+  "cancel_open_orders_on_exit": true,
+  "timeframe": "1d",
+
+  "unfilledtimeout": {
+    "entry": 10,
+    "exit": 10,
+    "unit": "minutes"
+  },
+
+  "entry_pricing": {
+    "price_side": "same",
+    "use_order_book": false,
+    "order_book_top": 1
+  },
+  "exit_pricing": {
+    "price_side": "same",
+    "use_order_book": false,
+    "order_book_top": 1
+  },
+
+  "exchange": {
+    "name": "binance",
+    "key": "",
+    "secret": "",
+    "ccxt_config": {},
+    "ccxt_async_config": {},
+    "pair_whitelist": ["BTC/USDT", "ETH/USDT", "SOL/USDT", "LINK/USDT", "UNI/USDT", "AAVE/USDT"],
+    "pair_blacklist": []
+  },
+
+  "$comment_fees": [
+    "Costs are charged explicitly rather than left at a default. The measured",
+    "failure of the existing strategy was frictional, not directional — 31",
+    "winning trades that still lost 6.16% — so a backtest that understates fees",
+    "would reproduce exactly the mistake this research exists to avoid."
+  ],
+  "fee": 0.0005,
+
+  "pairlists": [{ "method": "StaticPairList" }],
+
+  "telegram": { "enabled": false },
+  "api_server": { "enabled": false },
+
+  "bot_name": "venturedao-research",
+  "initial_state": "stopped",
+  "force_entry_enable": false,
+  "internals": { "process_throttle_secs": 5 }
+}

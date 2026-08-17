@@ -1,5 +1,5 @@
 import ccxt from 'ccxt'
-import { redact } from '../vault.js'
+import { redact } from '../../identity/vault.js'
 
 /**
  * Exchange access through CCXT.

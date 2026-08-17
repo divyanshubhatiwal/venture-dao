@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dailyProgress, dailyReport, entriesBlocked, inWindow, minutesToClose, STOP_REASON } from '../dailySession'
+import { dailyProgress, dailyReport, entriesBlocked, inWindow, minutesToClose, STOP_REASON } from '../trading/dailySession.js'
 
 const IST = 'Asia/Kolkata'
 /** 2026-08-15T04:30:00Z === 10:00 IST */

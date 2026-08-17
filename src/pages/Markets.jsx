@@ -9,12 +9,13 @@ import TradingStatusBar from '../components/TradingStatusBar'
 import BotControlPanel from '../components/BotControlPanel'
 import LiveValue from '../components/LiveValue'
 import { useMarket } from '../context/MarketContext'
-import { RANGES, WATCHLIST, getCandles } from '../lib/marketApi'
-import { INDICES, STOCKS, STOCK_RANGES, formatPrice, getIndexQuotes, getStockCandles, getStockQuotes } from '../lib/stockApi'
-import { INTERVAL_MS, mergeLiveCandle } from '../lib/liveCandles'
-import { detectCurrency, formatIn, getRate } from '../lib/fx'
-import { explainSignal, generateSignal, MIN_CANDLES } from '../lib/signals'
-import { DAO_STATS } from '../lib/mockData'
+import { RANGES, WATCHLIST, getCandles } from '../lib/market/marketApi'
+import { INDICES, STOCKS, STOCK_RANGES, formatPrice, getIndexQuotes, getStockCandles, getStockQuotes } from '../lib/market/stockApi'
+import { INTERVAL_MS, mergeLiveCandle } from '../lib/market/liveCandles'
+import { detectCurrency, formatIn, getRate } from '../lib/market/fx'
+import { getUsdtPeg } from '../lib/market/peg'
+import { explainSignal, generateSignal, MIN_CANDLES } from '../lib/trading/signals'
+import { DAO_STATS } from '../lib/demo/mockData'
 import { num, usd } from '../lib/format'
 
 /**
@@ -147,6 +148,19 @@ export default function Markets() {
   // there is no fallback constant.
   const [display, setDisplay] = useState(detectCurrency)
   const [rate, setRate] = useState(null)
+  // Binance quotes crypto in USDT, not USD. Without this the whole board sits
+  // ~0.1% above a true-USD reference like TradingView's CRYPTO:BTCUSD.
+  const [peg, setPeg] = useState(null)
+  useEffect(() => {
+    let alive = true
+    const pull = () => getUsdtPeg().then((r) => alive && setPeg(r))
+    pull()
+    const t = setInterval(pull, 60_000)
+    return () => {
+      alive = false
+      clearInterval(t)
+    }
+  }, [])
 
   useEffect(() => {
     let alive = true
@@ -230,14 +244,18 @@ export default function Markets() {
   // rate has loaded. Anything quoted in a third currency (GBP, JPY, HKD) is
   // left alone: converting it would need a second rate this does not fetch.
   const converting = currency === 'USD' && display !== 'USD' && rate != null
+  // Crypto only: equities are already quoted in real currency by the exchange.
+  const pegFactor = isCrypto && peg != null ? peg : 1
+
   const priceOf = useCallback(
     (v) => {
       if (v == null) return '—'
-      if (converting) return formatIn(v * rate, display)
-      if (currency === 'USD') return isCrypto ? cryptoPrice(v) : formatPrice(v, 'USD')
+      const usd = v * pegFactor
+      if (converting) return formatIn(usd * rate, display)
+      if (currency === 'USD') return isCrypto ? cryptoPrice(usd) : formatPrice(usd, 'USD')
       return formatPrice(v, currency)
     },
-    [converting, rate, display, currency, isCrypto],
+    [converting, rate, display, currency, isCrypto, pegFactor],
   )
 
   // The agent's read on whatever is currently charted. Recomputed as candles
@@ -270,8 +288,8 @@ export default function Markets() {
     <div className="animate-fade-up">
       <PageHeader
         eyebrow="Live markets"
-        title="Market Data"
-        subtitle="Real prices from public exchange and market-data APIs — crypto, listed equities and nine world indices. Candles, volume and moving averages update while you watch."
+        title="Markets"
+        subtitle="Real prices for crypto, shares and nine world markets. Charts and averages update while you watch."
         actions={
           <>
             <SourceBadge {...quotesMeta} />
@@ -415,6 +433,11 @@ export default function Markets() {
               </>
             )}
             <span className="text-slate-600">scroll to zoom · drag to pan</span>
+            {isCrypto && (
+              <span className="text-slate-600" title="Binance quotes in USDT; converted to true USD so prices match a USD reference.">
+                {peg != null ? `USDT→USD @ ${peg.toFixed(5)}` : 'USDT-quoted (peg unavailable)'}
+              </span>
+            )}
             {chart?.source && <span className="ml-auto">Candles: {chart.source}</span>}
           </div>
         </Card>

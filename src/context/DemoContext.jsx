@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { DEMO_STEPS } from '../lib/demoScript'
+import { DEMO_STEPS } from '../lib/demo/demoScript'
 
 const DemoContext = createContext(null)
 

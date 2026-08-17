@@ -1,5 +1,18 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import { BrowserProvider, formatEther } from 'ethers'
+
+/**
+ * ethers is loaded on demand, not at module scope.
+ *
+ * It is ~95 KB gzipped and the only thing that needs it is the optional
+ * "continue with wallet" button. Importing it statically meant every visitor —
+ * including anyone who only ever reads the landing page — downloaded a web3
+ * library to render text. Now the cost is paid by the people who click it.
+ */
+let ethersPromise = null
+const loadEthers = () => {
+  ethersPromise ??= import('ethers')
+  return ethersPromise
+}
 
 const SEPOLIA_CHAIN_ID = '0xaa36a7'
 
@@ -28,6 +41,7 @@ export function WalletProvider({ children }) {
   const hasMetaMask = typeof window !== 'undefined' && Boolean(window.ethereum)
 
   const readAccount = useCallback(async (address) => {
+    const { BrowserProvider, formatEther } = await loadEthers()
     const provider = new BrowserProvider(window.ethereum)
     const [balance, network] = await Promise.all([provider.getBalance(address), provider.getNetwork()])
     setChainId('0x' + network.chainId.toString(16))

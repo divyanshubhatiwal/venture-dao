@@ -1,5 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { getVenue } from '../lib/venues'
+import { getVenue } from '../lib/trading/venues'
+import { useMarket } from './MarketContext'
+import { getStockQuotes } from '../lib/market/stockApi'
 
 const TradingContext = createContext(null)
 
@@ -67,6 +69,50 @@ export function TradingProvider({ children }) {
   const updatePrices = useCallback((map) => {
     setPrices((prev) => ({ ...prev, ...map }))
   }, [])
+
+  /* ---------- marks, fed here rather than by whichever page is open ----------
+   *
+   * This used to be wired up inside the Trading page. That meant an open
+   * position was only marked to market while you were standing on that one
+   * screen: everywhere else `prices` stayed empty, `mark` fell back to `entry`,
+   * and every position reported exactly $0.00 profit no matter how far price
+   * had actually moved. Look at a position from the Markets page and it would
+   * sit frozen at its entry price forever.
+   *
+   * Marking a position is a property of holding it, not of which tab you are
+   * looking at, so it belongs in the provider that owns the positions. */
+  const market = useMarket()
+
+  // Crypto arrives over the websocket, so push marks through on every tick.
+  // This is what makes P&L move continuously rather than in steps.
+  useEffect(() => {
+    const map = {}
+    for (const t of market.tickers ?? []) if (t.price) map[t.symbol] = t.price
+    if (Object.keys(map).length) updatePrices(map)
+  }, [market.tickers, updatePrices])
+
+  // Equities have no public stream, so they get polled. Slower than crypto by
+  // necessity, but a stock position still has to mark against something.
+  useEffect(() => {
+    let alive = true
+    const pull = async () => {
+      try {
+        const { rows } = await getStockQuotes()
+        if (!alive) return
+        const map = {}
+        for (const r of rows) if (r.price) map[r.symbol] = r.price
+        if (Object.keys(map).length) updatePrices(map)
+      } catch {
+        /* Equities unavailable: crypto marks keep flowing regardless. */
+      }
+    }
+    pull()
+    const id = setInterval(pull, 20_000)
+    return () => {
+      alive = false
+      clearInterval(id)
+    }
+  }, [updatePrices])
 
   const priceOf = useCallback((symbol) => pricesRef.current[symbol] ?? null, [])
 

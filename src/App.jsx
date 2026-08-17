@@ -1,4 +1,23 @@
+import { Suspense, lazy } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
+/**
+ * Routes are split so a page only downloads what it needs.
+ *
+ * Everything used to arrive in one bundle, which meant a visitor reading the
+ * landing page also downloaded the charting library, the trading terminal and
+ * the agent — several hundred kilobytes to render marketing copy. Splitting
+ * here costs one small request per navigation and takes the first paint well
+ * below where it was.
+ */
+const Landing = lazy(() => import('./pages/Landing'))
+const Login = lazy(() => import('./pages/Login'))
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Markets = lazy(() => import('./pages/Markets'))
+const Trading = lazy(() => import('./pages/Trading'))
+const Macro = lazy(() => import('./pages/Macro'))
+const Agent = lazy(() => import('./pages/Agent'))
+const Kyc = lazy(() => import('./pages/Kyc'))
+
 import Layout from './components/Layout'
 import ErrorBoundary from './components/ErrorBoundary'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -9,13 +28,16 @@ import { DemoProvider } from './context/DemoContext'
 import { MarketProvider } from './context/MarketContext'
 import { TradingProvider } from './context/TradingContext'
 import { EpisodeProvider } from './context/EpisodeContext'
-import Dashboard from './pages/Dashboard'
-import Markets from './pages/Markets'
-import Trading from './pages/Trading'
-import Macro from './pages/Macro'
-import Agent from './pages/Agent'
-import Landing from './pages/Landing'
-import Login from './pages/Login'
+
+/** Shown while a route chunk downloads. Deliberately plain — a spinner that
+ *  flashes for 80ms is worse than a calm placeholder. */
+function RouteFallback() {
+  return (
+    <div className="grid min-h-screen place-items-center">
+      <div className="h-6 w-6 animate-spin rounded-full border-2 border-white/15 border-t-brand-400" />
+    </div>
+  )
+}
 
 export default function App() {
   return (
@@ -27,6 +49,7 @@ export default function App() {
               <TradingProvider>
                 <EpisodeProvider>
                   <DemoProvider>
+                    <Suspense fallback={<RouteFallback />}>
                     <Routes>
                       {/* Public. The landing page is the front door; login sits
                           outside Layout because it has its own chrome. */}
@@ -42,11 +65,13 @@ export default function App() {
                           <Route path="trading" element={<Trading />} />
                           <Route path="macro" element={<Macro />} />
                           <Route path="agent" element={<Agent />} />
+                          <Route path="kyc" element={<Kyc />} />
                         </Route>
                       </Route>
 
                       <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>
+                    </Suspense>
                   </DemoProvider>
                 </EpisodeProvider>
               </TradingProvider>

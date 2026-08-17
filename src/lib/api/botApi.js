@@ -19,8 +19,47 @@ async function call(path, { method = 'GET', body } = {}) {
   return json.data
 }
 
+/**
+ * One poller, many subscribers.
+ *
+ * The control panel and the status bar both want bot status every few seconds,
+ * and each running its own interval meant two identical requests per tick and
+ * two copies of the same state that could briefly disagree. Subscribers now
+ * share a single timer and a single answer; the poll stops when the last one
+ * unsubscribes so a backgrounded page is not still asking.
+ */
+const listeners = new Set()
+let pollTimer = null
+let lastStatus = null
+
+async function pollOnce() {
+  try {
+    lastStatus = await call('/status')
+    listeners.forEach((fn) => fn(lastStatus, null))
+  } catch (err) {
+    listeners.forEach((fn) => fn(null, err))
+  }
+}
+
+export function subscribeBotStatus(fn, intervalMs = 5000) {
+  listeners.add(fn)
+  if (lastStatus) fn(lastStatus, null)
+  if (!pollTimer) {
+    pollOnce()
+    pollTimer = setInterval(pollOnce, intervalMs)
+  }
+  return () => {
+    listeners.delete(fn)
+    if (listeners.size === 0) {
+      clearInterval(pollTimer)
+      pollTimer = null
+    }
+  }
+}
+
 export const botApi = {
   status: () => call('/status'),
+  suggest: () => call('/suggest'),
   start: () => call('/start', { method: 'POST' }),
   pause: () => call('/pause', { method: 'POST' }),
   // Unwrapped deliberately: /step answers { result, status } so a caller can

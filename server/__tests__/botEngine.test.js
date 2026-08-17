@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { BOT_STATES, createBotEngine, executionKey, preflight } from '../botEngine'
+import { BOT_STATES, createBotEngine, executionKey, preflight } from '../trading/botEngine.js'
 
 const NOW = 1_700_000_000_000
 
@@ -279,5 +279,35 @@ describe('cost-aware edge gate', () => {
     const d = decision({ quantity: 100, notional: 10_000, levels: { entry: 100, stop: 99, target: 100.025 } })
     const cfg = { ...config, maxLeverage: null, maxPositionPercent: null }
     expect(preflight({ ...base, config: cfg, decision: d }).ok).toBe(true)
+  })
+
+  /* Slippage is a cost and has to be counted as one.
+     These pin the band the old fee-only model let through. On a notional of
+     10,000 at 10bps fee and 5bps slippage:
+
+        fees alone      10,000 x (10 x 2 / 10,000) = 20   ->  3x rule needs 60
+        fees + slippage 10,000 x (15 x 2 / 10,000) = 30   ->  3x rule needs 90
+
+     so a target worth 75 cleared the old gate and fails the honest one. On a
+     five-minute horizon, where cost decides the outcome rather than direction,
+     that band is precisely where money quietly leaks. */
+  const slipCfg = { ...config, feeBps: 10, slippageBps: 5, minRewardToCost: 3, maxLeverage: null, maxPositionPercent: null }
+
+  it('rejects a target that clears fees but not fees plus slippage', () => {
+    const d = decision({ quantity: 100, notional: 10_000, levels: { entry: 100, stop: 99, target: 100.75 } })
+    const result = preflight({ ...base, config: slipCfg, decision: d })
+    expect(result.code).toBe('EDGE_BELOW_COST')
+    expect(result.detail).toMatch(/slippage/)
+  })
+
+  it('accepts the same trade once the target clears the full cost', () => {
+    const d = decision({ quantity: 100, notional: 10_000, levels: { entry: 100, stop: 99, target: 101 } })
+    expect(preflight({ ...base, config: slipCfg, decision: d }).ok).toBe(true)
+  })
+
+  it('treats a missing slippage figure as zero rather than throwing', () => {
+    const { slippageBps, ...noSlip } = slipCfg
+    const d = decision({ quantity: 100, notional: 10_000, levels: { entry: 100, stop: 99, target: 100.75 } })
+    expect(preflight({ ...base, config: noSlip, decision: d }).ok).toBe(true)
   })
 })

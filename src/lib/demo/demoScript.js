@@ -19,11 +19,11 @@ export const DEMO_STEPS = [
   },
   {
     id: 'problem',
-    route: '/dashboard',
-    target: '[data-demo="pipeline"]',
-    chapter: 'The pipeline',
+    route: '/trading',
+    target: '[data-demo="signals"]',
+    chapter: 'How it decides',
     narration:
-      'Four stages: read the macro context, score the setup with weighted checks, let a critic attack it, then learn from what actually happened. The risk engine sits at the end and has the last word.',
+      'Four steps: read the market background, score the setup with checks you can see, let a second pass argue against it, then learn from what actually happened. The safety limits run last and have the final say.',
     duration: 12000,
   },
   {

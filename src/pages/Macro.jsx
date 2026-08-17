@@ -3,8 +3,8 @@ import { Area, AreaChart, ResponsiveContainer, Tooltip, YAxis } from 'recharts'
 import { AlertTriangle, Compass, Gauge, Globe, Layers, RefreshCw, Scale, Waves } from 'lucide-react'
 import { Card, ChartTooltip, Chip, PageHeader, SectionTitle, Skeleton } from '../components/ui'
 import LiveValue, { LiveBadge } from '../components/LiveValue'
-import { getMacro } from '../lib/macro'
-import { formatPrice } from '../lib/stockApi'
+import { getMacro } from '../lib/market/macro'
+import { formatPrice } from '../lib/market/stockApi'
 import { usd } from '../lib/format'
 
 const toneClass = {
@@ -58,9 +58,9 @@ export default function Macro() {
   return (
     <div className="animate-fade-up">
       <PageHeader
-        eyebrow="Context layer"
-        title="Macro &amp; Flow"
-        subtitle="What a price chart cannot show you: volatility, the dollar, rates, global breadth, and where leverage is positioned. This is the backdrop every decision is taken into."
+        eyebrow="Market background"
+        title="Market background"
+        subtitle="The things a price chart hides: how jumpy markets are, the dollar, interest rates, and how much borrowed money is in play. Every decision is made against this backdrop."
         actions={
           <>
             <LiveBadge live={!loading && Boolean(data)} label={loading ? 'loading' : 'live'} />
@@ -82,7 +82,7 @@ export default function Macro() {
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <Compass size={16} className="text-brand-300" />
-                  <p className="label">Current regime</p>
+                  <p className="label">Market mood right now</p>
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-3">
                   <h2 className="text-2xl font-bold tracking-tight text-white">{regime.label}</h2>
@@ -147,7 +147,7 @@ export default function Macro() {
 
         {/* Breadth */}
         <Card className="p-5">
-          <SectionTitle icon={Globe} title="Global breadth" hint="How many world markets are actually up" />
+          <SectionTitle icon={Globe} title="World markets" hint="How many world markets are actually up" />
           {!data?.breadth?.ok ? (
             <Skeleton className="h-40" />
           ) : (
@@ -183,7 +183,7 @@ export default function Macro() {
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
         {/* Crypto aggregates */}
         <Card className="p-5">
-          <SectionTitle icon={Layers} title="Crypto aggregates" hint="Size and where capital is hiding" />
+          <SectionTitle icon={Layers} title="Crypto market total" hint="Size and where capital is hiding" />
           {!data?.crypto?.ok ? (
             <Skeleton className="h-32" />
           ) : (
@@ -317,7 +317,7 @@ export default function Macro() {
         </Card>
 
         <Card className="p-5">
-          <SectionTitle icon={Waves} title="Cross-venue funding" hint="Where leverage disagrees" />
+          <SectionTitle icon={Waves} title="Funding costs" hint="Where leverage disagrees" />
           {!data?.sentiment?.hyperliquid?.ok ? (
             <Skeleton className="h-32" />
           ) : (
@@ -355,7 +355,7 @@ export default function Macro() {
           <AlertTriangle size={13} className="mt-0.5 shrink-0 text-amber-400" />
           <span>
             Context, not prediction. A risk-off reading does not mean price falls — it means the conditions that often accompany
-            drawdowns are present. Every factor above is shown with the number it fired on so you can disagree with the
+            deep losses are present. Every factor above is shown with the number it fired on so you can disagree with the
             conclusion.
           </span>
         </p>

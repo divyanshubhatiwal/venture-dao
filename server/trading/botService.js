@@ -2,6 +2,7 @@ import { createBotEngine, BOT_STATES } from './botEngine.js'
 import { resolveConfig } from './delta.js'
 import { dailyProgress, dailyReport, inWindow, isAroundTheClock, minutesToClose } from './dailySession.js'
 import { createCcxtVenue } from './venues/ccxtVenue.js'
+import { decide } from '../../src/lib/agent/decision.js'
 
 /**
  * Owns the running bot and the ledger it trades against.
@@ -20,7 +21,10 @@ import { createCcxtVenue } from './venues/ccxtVenue.js'
  */
 
 const BINANCE = 'https://api.binance.com/api/v3'
-const FEE_BPS = 5 // round-trip taker cost, charged on every paper exit
+const FEE_BPS = 10 // taker fee per side, matching src/lib/venues.js
+// Adverse fill, per side. Excluded from the cost model entirely until now,
+// which understated a round trip by a third.
+const SLIPPAGE_BPS = 5
 const SYMBOL_MAP = { ETH: 'ETHUSDT', BTC: 'BTCUSDT', SOL: 'SOLUSDT', LINK: 'LINKUSDT' }
 
 const DEFAULT_CONFIG = {
@@ -46,6 +50,7 @@ const DEFAULT_CONFIG = {
   entryCutoffMinutes: 20,
   // A trade must clear its own round-trip cost by this multiple.
   feeBps: FEE_BPS,
+  slippageBps: SLIPPAGE_BPS,
   minRewardToCost: 3,
 }
 
@@ -111,16 +116,28 @@ function createPaperAdapter(config) {
         const hitTarget = position.target != null && (long ? mark >= position.target : mark <= position.target)
 
         if (!hitStop && !hitTarget) {
-          unrealised += (long ? mark - position.entry : position.entry - mark) * position.qty
+          const open = (long ? mark - position.entry : position.entry - mark) * position.qty
+          unrealised += open
+          // Stamped on the position so the UI can show the live price and P&L
+          // without every client re-fetching prices the server already has.
+          position.mark = mark
+          position.unrealised = +open.toFixed(2)
+          position.unrealisedPct = +((open / (position.entry * position.qty)) * 100).toFixed(3)
+          // How far price still has to travel to each exit, as a percentage.
+          position.toStopPct = +(((long ? mark - position.stop : position.stop - mark) / mark) * 100).toFixed(3)
+          position.toTargetPct =
+            position.target != null ? +(((long ? position.target - mark : mark - position.target) / mark) * 100).toFixed(3) : null
           continue
         }
 
         // Filled at the level, not at the mark: a stop that gapped through is
-        // still modelled as filling at the stop. Slippage is not simulated, so
-        // paper results are optimistic by exactly that amount.
+        // still modelled as filling at the stop, which remains optimistic.
+        // Slippage IS now charged, because a paper account that fills better
+        // than the real one teaches the wrong lesson about short-horizon
+        // trading, where cost is the whole game.
         const exit = hitStop ? position.stop : position.target
         const gross = (long ? exit - position.entry : position.entry - exit) * position.qty
-        const fee = Math.abs(exit * position.qty) * (FEE_BPS / 10_000)
+        const fee = Math.abs(exit * position.qty) * ((FEE_BPS + SLIPPAGE_BPS) / 10_000)
         const pnl = gross - fee
 
         ledger.balance += pnl
@@ -143,7 +160,7 @@ function createPaperAdapter(config) {
       const mark = await lastPrice(position.symbol)
       const long = position.side === 'long'
       const gross = (long ? mark - position.entry : position.entry - mark) * position.qty
-      const fee = Math.abs(mark * position.qty) * (FEE_BPS / 10_000)
+      const fee = Math.abs(mark * position.qty) * ((FEE_BPS + SLIPPAGE_BPS) / 10_000)
       const pnl = gross - fee
 
       ledger.balance += pnl
@@ -234,12 +251,41 @@ export function getBot(accountId = 'default', overrides = null, venueMode = null
       accountId,
       symbols: ['ETH', 'BTC', 'SOL', 'LINK'],
       intervalMs: 60_000,
+      // Protective exits are checked far more often than new setups.
+      monitorMs: 5_000,
       logger,
     })
     entry = entry2
     engines.set(accountId, entry)
   }
   return entry
+}
+
+/**
+ * How far the current ATR puts a stop from entry, per scanned market.
+ *
+ * Measured from the same pipeline that would place the trade, so the numbers
+ * the suggestion is built on are the numbers the bot would actually use.
+ * Markets with no valid setup contribute nothing rather than a guess.
+ */
+export async function measureStopDistances(accountId = 'default') {
+  const { config, adapter } = getBot(accountId)
+  const account = await adapter.getAccount()
+  const out = []
+
+  for (const symbol of ['ETH', 'BTC', 'SOL', 'LINK']) {
+    try {
+      const feed = await marketData(symbol)
+      const decision = decide({ symbol, candles: feed.candles, config, account, trades: [], episodes: [], openPositions: 0 })
+      const entry = decision?.levels?.entry
+      const stop = decision?.levels?.stop
+      if (!Number.isFinite(entry) || !Number.isFinite(stop) || entry <= 0) continue
+      out.push((Math.abs(entry - stop) / entry) * 100)
+    } catch {
+      /* one unreachable market must not sink the whole measurement */
+    }
+  }
+  return out
 }
 
 /** Everything the dashboard needs, with nothing sensitive in it. */

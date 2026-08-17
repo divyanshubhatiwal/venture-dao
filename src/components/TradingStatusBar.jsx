@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Activity, Ban, CircleDot, Pause, Radio } from 'lucide-react'
-import { deltaVenue } from '../lib/venues'
-import { botApi } from '../lib/botApi'
+import { deltaVenue } from '../lib/trading/venues'
+import { subscribeBotStatus } from '../lib/api/botApi'
 
 const BOT_CHIP = {
   running: { label: 'BOT RUNNING', tone: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300', icon: Activity },
@@ -36,20 +36,7 @@ export default function TradingStatusBar({ streaming, source }) {
   const [delta, setDelta] = useState(null)
   const [bot, setBot] = useState(null)
 
-  useEffect(() => {
-    let alive = true
-    const poll = () =>
-      botApi
-        .status()
-        .then((s) => alive && setBot(s))
-        .catch(() => alive && setBot(null))
-    poll()
-    const t = setInterval(poll, 5000)
-    return () => {
-      alive = false
-      clearInterval(t)
-    }
-  }, [])
+  useEffect(() => subscribeBotStatus((next, err) => setBot(err ? null : next)), [])
 
   useEffect(() => {
     let alive = true

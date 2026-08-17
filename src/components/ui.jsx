@@ -10,20 +10,12 @@ export function Card({ as: Tag = 'div', className = '', hover = false, children,
 
 export function PageHeader({ eyebrow, title, subtitle, actions }) {
   return (
-    <header className="relative mb-6 border-b border-white/[0.07] pb-5">
-      {/* A short accent rule sitting on the divider, marking where the page
-          content starts. Decorative, so it is hidden from assistive tech. */}
-      <span aria-hidden className="absolute -bottom-px left-0 h-px w-24 bg-gradient-to-r from-brand-400 to-accent" />
+    <header className="mb-6 border-b border-white/[0.07] pb-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          {eyebrow && (
-            <p className="label mb-2 flex items-center gap-2">
-              <span className="h-1 w-1 rounded-full bg-brand-400 shadow-[0_0_8px_2px_rgba(129,140,248,.6)]" />
-              {eyebrow}
-            </p>
-          )}
-          <h1 className="grad-text text-2xl font-bold tracking-tight sm:text-[30px]">{title}</h1>
-          {subtitle && <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-400">{subtitle}</p>}
+          {eyebrow && <p className="label mb-2">{eyebrow}</p>}
+          <h1 className="text-[26px] font-semibold tracking-tight text-white">{title}</h1>
+          {subtitle && <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-slate-400">{subtitle}</p>}
         </div>
         {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
       </div>
@@ -34,15 +26,11 @@ export function PageHeader({ eyebrow, title, subtitle, actions }) {
 export function SectionTitle({ icon: Icon, title, hint, action }) {
   return (
     <div className="mb-4 flex items-center justify-between gap-3">
-      <div className="flex items-center gap-2.5">
-        {Icon && (
-          <span className="grid h-8 w-8 place-items-center rounded-lg border border-white/10 bg-white/[0.05] text-brand-300">
-            <Icon size={15} />
-          </span>
-        )}
-        <div>
-          <h2 className="text-sm font-semibold text-slate-100">{title}</h2>
-          {hint && <p className="text-xs text-slate-500">{hint}</p>}
+      <div className="flex min-w-0 items-center gap-2">
+        {Icon && <Icon size={15} className="shrink-0 text-brand-300" />}
+        <div className="min-w-0">
+          <h2 className="text-[13px] font-semibold tracking-tight text-slate-100">{title}</h2>
+          {hint && <p className="mt-0.5 text-[11px] text-slate-500">{hint}</p>}
         </div>
       </div>
       {action}

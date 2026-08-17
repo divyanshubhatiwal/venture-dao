@@ -2,7 +2,7 @@ import { computeGoalState, computeStreaks } from './goalManager.js'
 import { deriveState } from './stateMachine.js'
 import { critique } from './critic.js'
 import { assessRisk } from './riskEngine.js'
-import { generateSignal } from '../signals.js'
+import { generateSignal } from '../trading/signals.js'
 
 /**
  * The decision pipeline, in the order the spec lays out:

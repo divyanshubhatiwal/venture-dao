@@ -8,20 +8,22 @@ import {
   LogOut,
   Menu,
   Search,
+  ShieldCheck,
   Target,
   X,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import CommandPalette from './CommandPalette'
 import DemoOverlay, { DemoLaunchButton } from './DemoOverlay'
-import { usingMocks } from '../lib/api'
+import { usingMocks } from '../lib/api/api'
 
 const NAV = [
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true, tag: null },
-  { to: '/markets', label: 'Live Markets', icon: CandlestickChart, tag: 'LIVE' },
-  { to: '/macro', label: 'Macro & Flow', icon: Compass, tag: 'CTX' },
-  { to: '/trading', label: 'Signals & Trading', icon: Bot, tag: 'PAPER' },
-  { to: '/agent', label: 'Goal Agent', icon: Target, tag: 'AUTO' },
+  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true },
+  { to: '/markets', label: 'Markets', icon: CandlestickChart },
+  { to: '/macro', label: 'Market background', icon: Compass },
+  { to: '/trading', label: 'Trade', icon: Bot },
+  { to: '/agent', label: 'Trading bot', icon: Target },
+  { to: '/kyc', label: 'Verify identity', icon: ShieldCheck },
 ]
 
 function Brand() {
@@ -32,17 +34,14 @@ function Brand() {
           <path d="M16 18l16 30 16-30" fill="none" stroke="white" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </span>
-      <div className="leading-tight">
-        <p className="text-[15px] font-bold tracking-tight text-white">VentureDAO</p>
-        <p className="text-[10px] font-medium uppercase tracking-[.16em] text-slate-500">Investment Intelligence</p>
-      </div>
+      <p className="text-[15px] font-semibold tracking-tight text-white">Venture DAO</p>
     </Link>
   )
 }
 
 /** Signed-in identity plus the way out. */
 function UserMenu() {
-  const { user, signOut } = useAuth()
+  const { user, signOut, initials } = useAuth()
   if (!user) return null
 
   // A full page load rather than a client-side navigation, for two reasons.
@@ -52,19 +51,30 @@ function UserMenu() {
   // signing out should discard everything the previous session accumulated in
   // memory — open paper positions, episode history, streamed market state —
   // and a reload does that unconditionally, where a route change does not.
-  const handleSignOut = () => {
-    signOut()
-    window.location.assign('/')
+  /**
+   * Ends the server session first, then does a full page load.
+   *
+   * The reload is not cosmetic: it discards everything the previous session
+   * accumulated in memory — open paper positions, episode history, streamed
+   * market state — which a client-side route change would leave sitting there
+   * for the next person to sign in on this machine.
+   */
+  const handleSignOut = async () => {
+    try {
+      await signOut()
+    } finally {
+      window.location.assign('/')
+    }
   }
 
   return (
     <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-2 py-1.5">
       <span className="grid h-7 w-7 place-items-center rounded-lg bg-gradient-to-br from-brand-600 to-accent text-[11px] font-bold text-white">
-        {user.initials}
+        {initials}
       </span>
       <div className="hidden leading-tight sm:block">
         <p className="max-w-[120px] truncate text-xs font-semibold text-slate-100">{user.name}</p>
-        <p className="text-[10px] text-slate-500">{user.method.startsWith('wallet') ? 'Wallet session' : 'Local session'}</p>
+        <p className="text-[10px] text-slate-500">{user.email}</p>
       </div>
       <button
         onClick={handleSignOut}
@@ -81,34 +91,27 @@ function UserMenu() {
 function NavItems({ onNavigate }) {
   return (
     <nav className="flex flex-col gap-1">
-      {NAV.map(({ to, label, icon: Icon, end, tag }) => (
+      {NAV.map(({ to, label, icon: Icon, end }) => (
         <NavLink
           key={to}
           to={to}
           end={end}
           onClick={onNavigate}
           className={({ isActive }) =>
-            `group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
-              isActive
-                ? 'bg-gradient-to-r from-brand-500/20 to-accent/10 text-white'
-                : 'text-slate-400 hover:bg-white/[0.05] hover:text-slate-100'
+            `group relative flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition ${
+              isActive ? 'bg-white/[0.07] text-white' : 'text-slate-400 hover:bg-white/[0.04] hover:text-slate-200'
             }`
           }
         >
           {({ isActive }) => (
             <>
               <span
-                className={`absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-gradient-to-b from-brand-400 to-accent transition-opacity ${
+                className={`absolute left-0 top-1/2 h-4 w-[2px] -translate-y-1/2 rounded-r-full bg-brand-400 transition-opacity ${
                   isActive ? 'opacity-100' : 'opacity-0'
                 }`}
               />
-              <Icon size={17} className={isActive ? 'text-brand-300' : 'text-slate-500 group-hover:text-slate-300'} />
+              <Icon size={16} className={isActive ? 'text-brand-300' : 'text-slate-500 group-hover:text-slate-300'} />
               <span className="flex-1">{label}</span>
-              {tag && (
-                <span className="rounded-md border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[10px] text-slate-500">
-                  {tag}
-                </span>
-              )}
             </>
           )}
         </NavLink>
@@ -132,7 +135,7 @@ export default function Layout() {
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 shrink-0 flex-col border-r border-white/[0.07] bg-ink-900/70 px-4 py-6 backdrop-blur-xl lg:flex">
         <Brand />
         <div className="mt-8 flex-1">
-          <p className="label mb-3 px-3">Modules</p>
+          <p className="label mb-2 px-3">Menu</p>
           <NavItems />
         </div>
         {/* Data source, stated once and quietly. The verbose card that used to
@@ -155,7 +158,7 @@ export default function Layout() {
               </button>
             </div>
             <div className="mt-8">
-              <p className="label mb-3 px-3">Modules</p>
+              <p className="label mb-2 px-3">Menu</p>
               <NavItems onNavigate={() => setOpen(false)} />
             </div>
           </aside>
@@ -197,7 +200,7 @@ export default function Layout() {
         </main>
 
         <footer className="border-t border-white/[0.07] px-4 py-5 text-center text-xs text-slate-600 sm:px-6">
-          VentureDAO · Not investment advice · The target is a goal, not a guarantee
+          Venture DAO · Not investment advice · The target is a goal, not a guarantee
         </footer>
       </div>
 

@@ -1,6 +1,6 @@
 import crypto from 'node:crypto'
 import { describe, expect, it } from 'vitest'
-import { decryptSecret, encryptSecret, loadKey, publicView, redact } from '../vault'
+import { decryptSecret, encryptSecret, loadKey, publicView, redact } from '../identity/vault.js'
 
 const KEY_HEX = crypto.randomBytes(32).toString('hex')
 const OTHER_HEX = crypto.randomBytes(32).toString('hex')

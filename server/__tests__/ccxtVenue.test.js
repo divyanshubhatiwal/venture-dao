@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createCcxtVenue, createExchange } from '../venues/ccxtVenue'
+import { createCcxtVenue, createExchange } from '../trading/venues/ccxtVenue'
 
 /**
  * These exercise our adapter, not CCXT. The exchange is stubbed so the tests
@@ -20,6 +20,11 @@ function stubVenue(over = {}) {
   venue.exchange.createOrder = over.createOrder ?? vi.fn(async () => ({ id: '999', status: 'closed', filled: 5, remaining: 0, average: 1880, fee: { cost: 0.01 } }))
   venue.exchange.fetchBalance = over.fetchBalance ?? vi.fn(async () => ({ USD: { total: 100, free: 90 } }))
   venue.exchange.fetchPositions = over.fetchPositions ?? vi.fn(async () => [])
+  // Every authenticated call runs ensureClock() first, which without this stub
+  // reaches out to the real exchange for its server time. That made these
+  // tests quietly network-bound: fast in isolation, timing out under load, and
+  // contradicting the promise at the top of this file.
+  venue.exchange.loadTimeDifference = over.loadTimeDifference ?? vi.fn(async () => 0)
   return { venue, market }
 }
 
