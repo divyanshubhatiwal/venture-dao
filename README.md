@@ -1,186 +1,360 @@
+<p align="center">
+  <img src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=white" />
+  <img src="https://img.shields.io/badge/Express-5-000000?style=flat-square&logo=express&logoColor=white" />
+  <img src="https://img.shields.io/badge/MongoDB-7-47A248?style=flat-square&logo=mongodb&logoColor=white" />
+  <img src="https://img.shields.io/badge/Vite-8-646CFF?style=flat-square&logo=vite&logoColor=white" />
+  <img src="https://img.shields.io/badge/TailwindCSS-3-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white" />
+  <img src="https://img.shields.io/badge/License-Private-red?style=flat-square" />
+</p>
+
 # Venture DAO
 
-A trading application in two halves that run as two separate processes:
+**Autonomous quantitative trading platform** with real-time market intelligence, ML-driven signal generation, and DAO governance — built as a full-stack monorepo deployed across Vercel (frontend) and Render (backend).
 
-| | Folder | What it is | Runs on |
-|---|---|---|---|
-| **Frontend** | [`src/`](src) | React 19 + Vite + Tailwind | `localhost:5173` |
-| **Backend** | [`server/`](server) | Express + MongoDB | `localhost:5000` |
-
-They talk over HTTP only. The browser never reaches an exchange or the database
-directly — everything goes through the backend, because an API secret in a
-browser bundle is a published secret.
+> A trading tool that only shows its good simulations is a sales pitch, not a tool.
 
 ---
 
-## Run it
+## Features
 
-Three terminals, in this order. The backend refuses to start without the
-database, so start that first.
+| Feature | Description |
+|---------|-------------|
+| **Autonomous Trading Bot** | Server-side execution engine with state machine lifecycle, fractional Kelly sizing, and idempotent order dispatch |
+| **Deterministic Risk Gates** | Mandatory preflight checks — drawdown ceilings, daily loss limits, position caps, and stop-loss enforcement — that nothing can override |
+| **Live Market Terminal** | Real-time candlestick charts with crosshair, wheel zoom, drag pan, fullscreen, and indicator overlays (EMA, ATR, Donchian, Bollinger) |
+| **Walk-Forward ML Signals** | Logistic regression model trained with gradient descent on scale-free features, validated with zero lookahead bias |
+| **AI Sentiment Analysis** | Gemini-powered news sentiment extraction with forward-performance tracking — votes with weight zero until accuracy is proven |
+| **DAO Governance** | On-chain proposal system with token-weighted voting, treasury telemetry, and delegation mechanics |
+| **Strategy Backtester** | Monte Carlo simulation engine with walk-forward validation across multiple timeframes and cost models |
+| **Macro Dashboard** | Global market indicators, equity proxies via Yahoo Finance, and cross-asset correlation tracking |
+| **Vault Security** | AES-256-GCM encryption for all credentials at rest, scrypt password hashing, and HMAC-signed exchange calls |
+| **Light / Dark Theme** | Full theme system with institutional-grade UI polish in both modes |
+
+---
+
+## Architecture
+
+```mermaid
+graph TB
+    subgraph Frontend["Frontend — Vercel"]
+        UI["React 19 + Vite + Tailwind"]
+        Pages["Pages"]
+        Lib["lib/ — Shared Logic"]
+        
+        Pages --- Landing["Landing"]
+        Pages --- Dash["Dashboard"]
+        Pages --- Mkt["Markets"]
+        Pages --- Trade["Trading"]
+        Pages --- Agent["Agent"]
+        Pages --- BT["Backtest"]
+        Pages --- Gov["Governance"]
+        Pages --- Macro["Macro"]
+    end
+
+    subgraph Backend["Backend — Render"]
+        API["Express 5 API"]
+        
+        subgraph Engine["Trading Engine"]
+            Bot["Bot State Machine"]
+            Risk["Risk Preflight"]
+            Session["Daily Sessions"]
+        end
+        
+        subgraph Adapters["Exchange Adapters"]
+            Delta["Delta Exchange — HMAC"]
+            CCXT["CCXT — Universal"]
+        end
+        
+        subgraph Intel["Market Intelligence"]
+            News["News Aggregation"]
+            Gemini["Gemini Sentiment"]
+            Track["Sentiment Tracker"]
+        end
+        
+        Auth["Identity / Auth / Vault"]
+    end
+
+    subgraph Data["MongoDB Atlas"]
+        DB[("Collections")]
+    end
+
+    subgraph Exchanges["Exchanges"]
+        Binance["Binance WebSocket"]
+        DeltaEx["Delta Exchange API"]
+    end
+
+    UI <-->|"HTTP / REST"| API
+    API --> Engine
+    API --> Intel
+    API --> Auth
+    Engine --> Adapters
+    Auth <--> DB
+    Engine <--> DB
+    Intel <--> DB
+    Adapters <-->|"HMAC-Signed"| DeltaEx
+    UI <-->|"WebSocket Ticker"| Binance
+
+    style Frontend fill:#0d1b2a,stroke:#3b82f6,color:#e2e8f0
+    style Backend fill:#0d1b2a,stroke:#10b981,color:#e2e8f0
+    style Data fill:#0d1b2a,stroke:#f59e0b,color:#e2e8f0
+    style Exchanges fill:#0d1b2a,stroke:#8b5cf6,color:#e2e8f0
+```
+
+---
+
+## Trading Pipeline
+
+```mermaid
+flowchart LR
+    A["Market Data\nBinance WebSocket"] --> B["Ingestor\nATR · EMA · Volume"]
+    B --> C["ML Signal\nGradient Descent\nClassifier"]
+    C --> D{"Signal\nDetected?"}
+    D -- No --> E["Cooldown\nWait for next cycle"]
+    D -- Yes --> F["Risk Preflight"]
+    
+    F --> G{"Passes\nAll Gates?"}
+    G -- No --> H["Blocked\nLog reason & wait"]
+    G -- Yes --> I["Position Sizing\nFractional Kelly"]
+    I --> J["Order Dispatch\nDelta · CCXT · Paper"]
+    J --> K["Position Open\nStop-loss placed"]
+    K --> L["Manage\nTrailing stop · TP"]
+    L --> M["Position Closed\nReconcile & log"]
+    M --> E
+
+    style A fill:#1e3a5f,stroke:#3b82f6,color:#e2e8f0
+    style C fill:#1e3a5f,stroke:#8b5cf6,color:#e2e8f0
+    style F fill:#1e3a5f,stroke:#f59e0b,color:#e2e8f0
+    style H fill:#3b1c1c,stroke:#ef4444,color:#e2e8f0
+    style J fill:#1e3a5f,stroke:#10b981,color:#e2e8f0
+    style M fill:#1a3a2a,stroke:#10b981,color:#e2e8f0
+```
+
+---
+
+## Risk Gate System
+
+```mermaid
+flowchart TD
+    Order["Incoming Trade Signal"] --> G1
+    
+    G1{"Kill Switch\nActive?"} -- Yes --> BLOCK["BLOCKED"]
+    G1 -- No --> G2
+    
+    G2{"Max Drawdown\nExceeded?"} -- Yes --> BLOCK
+    G2 -- No --> G3
+    
+    G3{"Daily Loss\nLimit Hit?"} -- Yes --> BLOCK
+    G3 -- No --> G4
+    
+    G4{"Position Size\n> Notional Cap?"} -- Yes --> BLOCK
+    G4 -- No --> G5
+    
+    G5{"Stop-Loss\nPlaced?"} -- No --> BLOCK
+    G5 -- Yes --> G6
+    
+    G6{"Edge > Cost?\nRound-trip fees"} -- No --> BLOCK
+    G6 -- Yes --> G7
+    
+    G7{"Data Freshness\n< 90 seconds?"} -- No --> BLOCK
+    G7 -- Yes --> APPROVE["APPROVED\nSubmit to Exchange"]
+
+    style Order fill:#1e3a5f,stroke:#3b82f6,color:#e2e8f0
+    style BLOCK fill:#3b1c1c,stroke:#ef4444,color:#fca5a5
+    style APPROVE fill:#1a3a2a,stroke:#10b981,color:#6ee7b7
+```
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| **Frontend** | React 19, Vite 8, TailwindCSS 3, Recharts, Lucide Icons, React Router 7 |
+| **Backend** | Express 5, MongoDB 7 (native driver), CCXT, Axios |
+| **Security** | AES-256-GCM vault, scrypt hashing, HMAC request signing, rate limiting, CORS |
+| **AI / ML** | Custom gradient descent classifier, Google Gemini sentiment API |
+| **Blockchain** | Ethers.js 6, DAO governance contracts |
+| **Deployment** | Vercel (frontend), Render (backend), MongoDB Atlas (database) |
+| **Testing** | Vitest |
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+- **Node.js** ≥ 18
+- **npm** ≥ 9
+- MongoDB (local or Atlas URI)
+
+### Installation
 
 ```bash
+# Clone the repository
+git clone https://github.com/divyanshubhatiwal/venture-dao.git
+cd venture-dao
+
+# Install all dependencies (root + workspaces)
 npm install
+
+# Copy environment template
+cp .env.example .env
+# Edit .env with your credentials
 ```
+
+### Running Locally
+
+Start these in order — the backend needs the database first:
 
 ```bash
-npm run db        # MongoDB on :27017
+# Terminal 1 — Database
+npm run db
+
+# Terminal 2 — Backend API (localhost:5000)
+npm run server
+
+# Terminal 3 — Frontend dev server (localhost:5173)
+npm run dev
 ```
 
-```bash
-npm run server    # backend on :5000
-```
+Then open [http://localhost:5173](http://localhost:5173).
 
-```bash
-npm run dev       # frontend on :5173
-```
+### Available Scripts
 
-Then open <http://localhost:5173>.
-
-`npm run db` runs a real MongoDB against `server/data/mongo`. It is a
-development convenience for machines with no MongoDB installed — no
-authentication, bound to localhost, and it stops with the terminal. For
-anything else, install MongoDB Community Server or point `MONGODB_URI` at
-Atlas; the application cannot tell the difference.
-
-Other commands:
-
-```bash
-npm test          # 307 tests
-npm run build     # production bundle into dist/
-npm run db:migrate  # one-off import from the old SQLite file
-```
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start frontend dev server |
+| `npm run server` | Start backend server |
+| `npm run server:dev` | Start backend with hot-reload |
+| `npm run db` | Start local MongoDB instance |
+| `npm test` | Run all tests |
+| `npm run test:backend` | Run backend tests only |
+| `npm run test:frontend` | Run frontend tests only |
+| `npm run build` | Production build |
+| `npm run preflight` | Verify exchange connectivity and config |
+| `npm run db:migrate` | Import from legacy SQLite |
 
 ---
 
-## Backend — `server/`
-
-Grouped by what each part is responsible for, so you can find things by asking
-"what does this do" rather than by remembering filenames.
+## Project Structure
 
 ```
-server/
-├── index.js            server entry point (MongoDB connection, background tasks, listen)
-├── app.js              Express application factory and middleware configuration
+venture-dao/
+├── frontend/                    # React SPA (Vercel)
+│   └── src/
+│       ├── pages/               # Route-level screens
+│       │   ├── Landing.jsx      # Public marketing page
+│       │   ├── Dashboard.jsx    # Portfolio overview
+│       │   ├── Markets.jsx      # Live market terminal & charts
+│       │   ├── Trading.jsx      # Order execution interface
+│       │   ├── Agent.jsx        # Autonomous bot controls
+│       │   ├── Backtest.jsx     # Strategy backtester
+│       │   ├── Governance.jsx   # DAO proposals & voting
+│       │   └── Macro.jsx        # Global macro indicators
+│       ├── components/          # Shared UI components
+│       ├── context/             # React contexts (Auth, Market, Trading, Theme, etc.)
+│       └── lib/                 # Business logic (no UI)
+│           ├── api/             # Backend API clients
+│           ├── market/          # Price feeds, candles, currency conversion
+│           ├── trading/         # Indicators, signals, backtests, strategies
+│           ├── agent/           # Decision pipeline & reasoning
+│           └── demo/            # Guided tour & demo dataset
 │
-├── routes/             modular domain API routers
-│   ├── authRoutes.js     authentication routes (register, login, logout, me)
-│   ├── botRoutes.js      autonomous bot controls & status
-│   ├── venueRoutes.js    Delta Exchange order and account routes
-│   ├── newsRoutes.js     market headlines and Gemini sentiment
-│   └── proxyRoutes.js    Yahoo Finance equity proxy
+├── backend/                     # Express API (Render)
+│   ├── routes/                  # Domain API routers
+│   │   ├── authRoutes.js        # Register, login, logout, session
+│   │   ├── botRoutes.js         # Bot controls & status
+│   │   ├── venueRoutes.js       # Exchange order routing
+│   │   ├── newsRoutes.js        # Headlines & sentiment
+│   │   └── proxyRoutes.js       # Yahoo Finance equity proxy
+│   ├── middleware/              # Auth guards, rate limiting, async helpers
+│   ├── identity/                # Authentication & AES-256 vault
+│   ├── storage/                 # MongoDB connection, queries, indexes
+│   ├── trading/                 # Bot engine, daily sessions, exchange adapters
+│   ├── market/                  # News, Gemini sentiment, performance tracking
+│   └── __tests__/               # Backend test suite
 │
-├── middleware/         shared request handlers
-│   ├── authMiddleware.js   session lookup and requireAuth guards
-│   ├── throttleMiddleware.js brute-force login rate limiter
-│   └── asyncHelper.js      standardized JSON response & error wrapper
-│
-├── identity/           who someone is, and their credentials
-│   ├── auth.js           passwords (scrypt), sessions, cookies
-│   └── vault.js          AES-256-GCM encryption for anything at rest
-│
-├── storage/            the database, and nothing else
-│   ├── mongo.js          connection, pooling, indexes
-│   └── db.js             every query in the application
-│
-├── trading/            the bot and the exchanges
-│   ├── botEngine.js      the safety gates — decides if a trade may happen
-│   ├── botService.js     the run loop, positions, the paper account
-│   ├── dailySession.js   market hours and session windows
-│   ├── suggestConfig.js  proposes settings from account size
-│   ├── delta.js          Delta Exchange client (HMAC-signed)
-│   └── venues/           exchange adapters via CCXT
-│
-├── market/
-│   ├── news.js           market news, fetched and cached server-side
-│   ├── gemini.js         AI sentiment extraction
-│   └── sentimentTrack.js forward performance tracking for AI signals
-│
-├── scripts/            one-off tools, not part of the running server
-├── __tests__/
-└── data/               runtime database files — gitignored, never source
+└── research/                    # Model training & analysis artifacts
 ```
 
-**Where to start reading:** `app.js` mounts the domain routers, and `routes/` defines each endpoint group. From a
-route you can follow one hop into whichever folder does the work.
-
-**The most important file** is `trading/botEngine.js`. Its `preflight()`
-function holds every rule that can stop a trade — position size, leverage,
-drawdown, daily loss, stop-loss presence, whether the trade can even cover its
-own costs. It runs last and nothing can overrule it.
-
----
-
-## Frontend — `src/`
-
-```
-src/
-├── main.jsx, App.jsx    entry point and routing
-├── pages/               one file per screen
-├── components/          shared UI
-├── context/             app-wide state (auth, market prices, trading)
-│
-└── lib/                 logic with no UI, grouped the same way as the backend
-    ├── format.js          formatting, used everywhere — stays at the top
-    ├── api/               clients for our own backend
-    ├── market/            live prices, candles, macro, currency conversion
-    ├── trading/           indicators, signals, backtests, costs, strategies/
-    ├── agent/             the decision pipeline and its reasons
-    └── demo/              the guided tour and its dataset
-```
-
-Pages are lazy-loaded per route, so opening the dashboard does not download the
-trading screen.
-
-`lib/` mirrors the backend's folders on purpose: `trading` on one side matches
-`trading` on the other, so a change usually lands in the same-named folder in
-both halves.
-
----
-
-## One deliberate crossover
-
-`server/trading/` imports three modules from `src/lib/`:
-
-```
-src/lib/agent/decision.js        how a trade decision is made
-src/lib/agent/goalManager.js     goal and risk state
-src/lib/trading/marketStress.js  market stress scoring
-```
-
-These are shared on purpose — the same decision logic runs in the browser for
-the simulator and on the server for the live bot, and duplicating it would let
-the two drift apart, which is worse than the crossover. They contain no UI and
-no browser APIs.
-
-It is the one place the halves are not cleanly separated, and it is deliberate
-rather than accidental.
+> **Design principle:** `lib/` in the frontend mirrors the backend's folders — `trading/` matches `trading/`, `agent/` matches `agent/`. A change usually lands in the same-named folder on both sides.
 
 ---
 
 ## Configuration
 
-Copy `.env.example` to `.env` and fill it in. `.env` is gitignored and must
-never be committed.
+Copy `.env.example` → `.env` and fill in your values. The `.env` file is gitignored and must never be committed.
 
-Nothing holding a secret may be prefixed `VITE_` — that prefix compiles a value
-into the browser bundle, which for a database URI or an API secret means
-publishing it.
+### Key Environment Variables
 
-Live trading requires **both** `DELTA_ENV=live` and `DELTA_ALLOW_LIVE=true`.
-Either one alone falls back to testnet, so a single typo cannot start moving
-real money.
+| Variable | Description |
+|----------|-------------|
+| `MONGODB_URI` | MongoDB connection string |
+| `DELTA_API_KEY` / `DELTA_API_SECRET` | Delta Exchange credentials |
+| `DELTA_VAULT_KEY` | AES-256-GCM key for encrypting secrets at rest |
+| `GEMINI_API_KEY` | Google Gemini API key for sentiment analysis |
+| `CORS_ORIGIN` | Allowed frontend origin |
+| `DELTA_ENV` | `testnet` or `live` |
+| `DELTA_ALLOW_LIVE` | Must be `true` alongside `DELTA_ENV=live` to enable real trading |
+
+> **Security:** Nothing holding a secret may be prefixed `VITE_` — that prefix compiles values into the browser bundle.
+
+> **Live trading** requires **both** `DELTA_ENV=live` and `DELTA_ALLOW_LIVE=true`. Either one alone falls back to testnet, so a single typo cannot start moving real money.
 
 ---
 
-## What this is honest about
+## Deployment
 
-The strategy does not currently have a demonstrated edge. Measured on this
-project's own data:
+| Service | Platform | Purpose |
+|---------|----------|---------|
+| Database | MongoDB Atlas | Managed database with IP allowlisting |
+| Backend | Render | Long-running process with static outbound IP |
+| Frontend | Vercel | Static bundle with edge CDN |
 
-- 31 winning trades out of 31, and the account still lost 6.16% — fees came to
-  four times the gross profit
-- 0 of 2,000 simulated runs reached the goal; every one hit the loss limit
-- best profit factor found was 0.94, and anything under 1.0 loses money
+> **Key constraint:** Delta Exchange whitelists API keys by IP. The backend needs a fixed outbound address — this rules out most free tiers.
 
-Those numbers are on the landing page as well as in here. A trading tool that
-only shows its good simulations is a sales pitch, not a tool.
+See [`DEPLOY.md`](DEPLOY.md) for the full deployment guide.
+
+---
+
+## Testing
+
+```bash
+# Run all tests
+npm test
+
+# Backend only
+npm run test:backend
+
+# Frontend only
+npm run test:frontend
+
+# Exchange connectivity check (read-only, places nothing)
+npm run preflight
+```
+
+---
+
+## Honest Performance Disclosure
+
+This project measures and reports its own performance honestly:
+
+- **Profit factor 0.94** — below 1.0 loses money, and it stayed below with fees zeroed
+- **31 winning trades out of 31**, account still down **6.16%** — fees were 4× gross profit
+- **0 of 2,000 simulated runs** reached the goal; every one hit the loss limit
+- The trained model has **negative out-of-sample lift** on every market tested
+- News sentiment has **not yet been proven** and votes with weight zero
+
+These numbers are displayed on the landing page. A trading tool that hides its losses is a sales pitch, not a tool.
+
+---
+
+## License
+
+This project is private and proprietary.
+
+---
+
+<p align="center">
+  Built by <a href="https://github.com/divyanshubhatiwal">Divyanshu Bhatiwal</a>
+</p>
