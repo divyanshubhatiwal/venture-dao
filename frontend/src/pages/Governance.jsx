@@ -34,6 +34,7 @@ import { Card, Chip, PageHeader, SectionTitle, Skeleton } from '../components/ui
 import { useWallet } from '../context/WalletContext'
 import { useMarket } from '../context/MarketContext'
 import { useToast } from '../context/ToastContext'
+import { DAO_STATS } from '../lib/protocol'
 import { num, relativeTime, usd } from '../lib/format'
 
 const INITIAL_PROPOSALS = [

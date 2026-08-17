@@ -13,6 +13,7 @@ import { INDICES, STOCKS, STOCK_RANGES, formatPrice, getIndexQuotes, getStockCan
 import { INTERVAL_MS, mergeLiveCandle } from '../lib/market/liveCandles'
 import { detectCurrency, formatIn, getRate } from '../lib/market/fx'
 import { explainSignal, generateSignal, MIN_CANDLES } from '../lib/trading/signals'
+import { DAO_STATS } from '../lib/protocol'
 import { num, usd } from '../lib/format'
 
 /**
