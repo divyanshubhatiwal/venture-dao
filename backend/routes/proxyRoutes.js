@@ -1,14 +1,30 @@
 import { Router } from 'express'
+import { proxyRateLimit } from '../middleware/securityMiddleware.js'
 
 const router = Router()
 
+// Whitelist of valid Yahoo Finance path prefixes
+const ALLOWED_PATH_PATTERNS = [
+  /^\/v8\/finance\/chart\/[a-zA-Z0-9^.%=-]+/,
+  /^\/v7\/finance\/quote/,
+  /^\/v1\/finance\/search/,
+]
+
 /**
- * World equities and indices proxy for Yahoo Finance in production.
- * Yahoo Finance sends no CORS headers, so browser requests proxy through here.
+ * Hardened Yahoo Finance proxy with rate limiting and path whitelisting.
  */
-router.use('/', async (req, res) => {
+router.use('/', proxyRateLimit, async (req, res) => {
   try {
     const yfPath = req.originalUrl.replace(/^\/yf/, '')
+    const isAllowed = ALLOWED_PATH_PATTERNS.some((pattern) => pattern.test(yfPath))
+
+    if (!isAllowed) {
+      return res.status(403).json({
+        ok: false,
+        error: 'Forbidden: Proxy endpoint path is restricted to financial charts and quotes.',
+      })
+    }
+
     const targetUrl = `https://query1.finance.yahoo.com${yfPath}`
     const response = await fetch(targetUrl, {
       headers: {

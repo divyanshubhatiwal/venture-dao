@@ -49,6 +49,7 @@ const INDEXES = {
     { key: { symbol: 1, readAt: 1 }, name: 'symbol_time' },
     { key: { scored: 1 }, name: 'scored' },
   ],
+  botSessions: [{ key: { userId: 1 }, unique: true, name: 'user_bot_unique' }],
 }
 
 export function mongoUri() {
@@ -137,4 +138,5 @@ export const collections = {
   // Sentiment readings kept so they can be scored against what price actually
   // did afterwards. Evidence has to accumulate somewhere durable.
   sentimentReadings: () => getDatabase().collection('sentimentReadings'),
+  botSessions: () => getDatabase().collection('botSessions'),
 }

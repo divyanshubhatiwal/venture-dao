@@ -17,6 +17,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 const API = import.meta.env?.VITE_API_URL || ''
 const AuthContext = createContext(null)
 
+import { getAuthHeaders, setAuthToken } from '../lib/api/authHeader'
+
 export function useAuth() {
   const ctx = useContext(AuthContext)
   if (!ctx) throw new Error('useAuth must be used inside <AuthProvider>')
@@ -24,10 +26,11 @@ export function useAuth() {
 }
 
 async function call(path, { method = 'GET', body } = {}) {
+  const headers = getAuthHeaders(body ? { 'Content-Type': 'application/json' } : {})
   const res = await fetch(`${API}/api/auth${path}`, {
     method,
     credentials: 'include',
-    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    headers,
     body: body ? JSON.stringify(body) : undefined,
   })
   const json = await res.json().catch(() => ({ ok: false, error: `HTTP ${res.status}` }))
@@ -63,6 +66,7 @@ export function AuthProvider({ children }) {
     setPending(true)
     try {
       const data = await call('/login', { method: 'POST', body: { email, password } })
+      if (data?.token) setAuthToken(data.token)
       setUser(data.user)
       return data.user
     } finally {
@@ -74,6 +78,7 @@ export function AuthProvider({ children }) {
     setPending(true)
     try {
       const data = await call('/register', { method: 'POST', body: { email, password, name } })
+      if (data?.token) setAuthToken(data.token)
       setUser(data.user)
       return data.user
     } finally {
@@ -89,6 +94,7 @@ export function AuthProvider({ children }) {
     try {
       await call('/logout', { method: 'POST' })
     } finally {
+      setAuthToken(null)
       setUser(null)
     }
   }, [])

@@ -9,16 +9,18 @@ import {
 } from '../identity/auth.js'
 import { asHandler } from '../middleware/asyncHelper.js'
 import { loginThrottle } from '../middleware/throttleMiddleware.js'
+import { registerRateLimit } from '../middleware/securityMiddleware.js'
 
 const router = Router()
 
 router.post(
   '/register',
+  registerRateLimit,
   asHandler(async (req) => {
     const user = await authRegister({ email: req.body?.email, password: req.body?.password, name: req.body?.name })
     const { token, expiresAt } = await issueSession(user.id, { userAgent: req.headers['user-agent'] ?? null })
     req.res.setHeader('Set-Cookie', sessionCookie(token, { expiresAt }))
-    return { user }
+    return { user, token }
   }),
 )
 
@@ -34,7 +36,7 @@ router.post('/login', loginThrottle, async (req, res, next) => {
     req.clearFailures()
     const { token, expiresAt } = await issueSession(user.id, { userAgent: req.headers['user-agent'] ?? null })
     res.setHeader('Set-Cookie', sessionCookie(token, { expiresAt }))
-    res.json({ ok: true, data: { user } })
+    res.json({ ok: true, data: { user, token } })
   } catch (err) {
     next(err)
   }

@@ -9,7 +9,19 @@ import { COOKIE_NAME, parseCookies, publicUser, resolveSession } from '../identi
  * calling.
  */
 export async function sessionMiddleware(req, _res, next) {
-  const token = parseCookies(req.headers.cookie)[COOKIE_NAME]
+  let token = null
+
+  // 1. Check Authorization: Bearer <token> header (standard for decoupled cross-site apps)
+  const authHeader = req.headers.authorization || req.headers.Authorization
+  if (typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
+    token = authHeader.slice(7).trim()
+  }
+
+  // 2. Fall back to Cookie
+  if (!token && req.headers.cookie) {
+    token = parseCookies(req.headers.cookie)[COOKIE_NAME] || null
+  }
+
   req.sessionToken = token ?? null
   try {
     req.user = token ? publicUser(await resolveSession(token)) : null

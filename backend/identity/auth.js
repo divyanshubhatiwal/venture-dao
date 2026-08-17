@@ -180,21 +180,29 @@ export function parseCookies(header = '') {
 /**
  * Session cookie.
  *
- * httpOnly keeps it away from page scripts, SameSite=Lax keeps it off
- * cross-site requests, and Secure is set whenever the deployment is not plain
- * local HTTP — a Secure cookie is simply dropped over http://localhost, which
- * would make development look broken for no security gain.
+ * In production (HTTPS across domains like Vercel -> Render), SameSite=None; Secure
+ * ensures cross-site API calls retain session credentials. In local HTTP development,
+ * SameSite=Lax is used so browsers without HTTPS do not reject the cookie.
  */
 export function sessionCookie(token, { expiresAt, secure = process.env.NODE_ENV === 'production' } = {}) {
+  const sameSite = secure ? 'SameSite=None' : 'SameSite=Lax'
   const parts = [
     `${COOKIE_NAME}=${token}`,
     'HttpOnly',
-    'SameSite=Lax',
+    sameSite,
     'Path=/',
     `Expires=${new Date(expiresAt).toUTCString()}`,
   ]
-  if (secure) parts.push('Secure')
+  if (secure) {
+    parts.push('Secure')
+    parts.push('Partitioned')
+  }
   return parts.join('; ')
 }
 
-export const clearCookie = () => `${COOKIE_NAME}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`
+export function clearCookie({ secure = process.env.NODE_ENV === 'production' } = {}) {
+  const sameSite = secure ? 'SameSite=None' : 'SameSite=Lax'
+  const parts = [`${COOKIE_NAME}=`, 'HttpOnly', sameSite, 'Path=/', 'Max-Age=0']
+  if (secure) parts.push('Secure')
+  return parts.join('; ')
+}

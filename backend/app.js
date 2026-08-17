@@ -8,15 +8,19 @@ import venueRoutes from './routes/venueRoutes.js'
 import newsRoutes from './routes/newsRoutes.js'
 import proxyRoutes from './routes/proxyRoutes.js'
 
+import { securityHeaders, globalRateLimit } from './middleware/securityMiddleware.js'
+
 /**
  * VentureDAO Express Application.
  *
- * Configures CORS, JSON body parser, session authentication middleware,
- * and mounts domain routers.
+ * Configures defensive security headers, rate limiting, CORS, JSON body parser,
+ * session authentication middleware, and mounts domain routers.
  */
 export function createApp() {
   const app = express()
 
+  app.use(securityHeaders)
+  app.use(globalRateLimit)
   app.use(express.json({ limit: '256kb' }))
   app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:5173', credentials: true }))
   app.use(sessionMiddleware)

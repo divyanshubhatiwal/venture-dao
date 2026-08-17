@@ -167,3 +167,30 @@ export const getExchangeAccount = async (userId, id) =>
   clean(await collections.exchangeAccounts().findOne({ _id: id, userId }))
 
 export const deleteExchangeAccount = (userId, id) => collections.exchangeAccounts().deleteOne({ _id: id, userId })
+
+/* ---------- bot sessions ---------- */
+
+export async function saveBotSession(userId, { state, config, ledger, updatedAt = Date.now() }) {
+  await collections.botSessions().updateOne(
+    { userId },
+    {
+      $set: {
+        userId,
+        state,
+        config,
+        ledger,
+        updatedAt,
+      },
+    },
+    { upsert: true },
+  )
+}
+
+export async function getBotSession(userId) {
+  return clean(await collections.botSessions().findOne({ userId }))
+}
+
+export async function listAllActiveBotSessions() {
+  return (await collections.botSessions().find({ state: 'RUNNING' }).toArray()).map((doc) => clean(doc))
+}
+

@@ -1,3 +1,5 @@
+import { getAuthHeaders } from './authHeader.js'
+
 const API = import.meta.env?.VITE_API_URL || ''
 
 /**
@@ -9,9 +11,11 @@ const API = import.meta.env?.VITE_API_URL || ''
  * running" is a second source of truth that can disagree with the engine.
  */
 async function call(path, { method = 'GET', body } = {}) {
+  const headers = getAuthHeaders(body ? { 'Content-Type': 'application/json' } : {})
   const res = await fetch(`${API}/api/bot${path}`, {
     method,
-    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    credentials: 'include',
+    headers,
     body: body ? JSON.stringify(body) : undefined,
   })
   const json = await res.json().catch(() => ({ ok: false, error: `HTTP ${res.status}` }))
