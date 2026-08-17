@@ -71,9 +71,15 @@ export async function connectMongo({ uri = mongoUri(), dbName = mongoDbName() } 
   if (connecting) return connecting
 
   connecting = (async () => {
-    client = new MongoClient(uri, {
-      serverSelectionTimeoutMS: 15_000,
-    })
+    const isAtlas = uri.startsWith('mongodb+srv://') || uri.includes('mongodb.net')
+    const options = {
+      serverSelectionTimeoutMS: 30_000,
+      connectTimeoutMS: 30_000,
+    }
+    if (isAtlas) {
+      options.tls = true
+    }
+    client = new MongoClient(uri, options)
     await client.connect()
     database = client.db(dbName)
     await ensureIndexes(database)
