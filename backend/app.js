@@ -21,8 +21,32 @@ export function createApp() {
 
   app.use(securityHeaders)
   app.use(globalRateLimit)
+  const configuredOrigin = (process.env.CORS_ORIGIN || 'http://localhost:5173').replace(/\/+$/, '')
+
+  app.use(
+    cors({
+      origin: (origin, callback) => {
+        // Allow requests with no origin (mobile, curl, server-to-server)
+        if (!origin) return callback(null, true)
+        const cleanOrigin = origin.replace(/\/+$/, '')
+        if (
+          cleanOrigin === configuredOrigin ||
+          cleanOrigin.endsWith('.vercel.app') ||
+          cleanOrigin.endsWith('.onrender.com') ||
+          cleanOrigin.includes('localhost') ||
+          cleanOrigin.includes('127.0.0.1')
+        ) {
+          return callback(null, true)
+        }
+        callback(null, false)
+      },
+      credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+      exposedHeaders: ['Set-Cookie'],
+    }),
+  )
   app.use(express.json({ limit: '256kb' }))
-  app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:5173', credentials: true }))
   app.use(sessionMiddleware)
 
   // Root index and health endpoints
