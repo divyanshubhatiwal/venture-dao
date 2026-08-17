@@ -59,12 +59,23 @@ Grouped by what each part is responsible for, so you can find things by asking
 
 ```
 server/
-├── index.js            every HTTP route, and the only entry point
+├── index.js            server entry point (MongoDB connection, background tasks, listen)
+├── app.js              Express application factory and middleware configuration
+│
+├── routes/             modular domain API routers
+│   ├── authRoutes.js     authentication routes (register, login, logout, me)
+│   ├── botRoutes.js      autonomous bot controls & status
+│   ├── venueRoutes.js    Delta Exchange order and account routes
+│   ├── newsRoutes.js     market headlines and Gemini sentiment
+│   └── proxyRoutes.js    Yahoo Finance equity proxy
+│
+├── middleware/         shared request handlers
+│   ├── authMiddleware.js   session lookup and requireAuth guards
+│   ├── throttleMiddleware.js brute-force login rate limiter
+│   └── asyncHelper.js      standardized JSON response & error wrapper
 │
 ├── identity/           who someone is, and their credentials
 │   ├── auth.js           passwords (scrypt), sessions, cookies
-│   ├── kyc.js            PAN records — no UI reaches these any more
-│   ├── kycVideo.js       liveness challenges — no UI reaches these any more
 │   └── vault.js          AES-256-GCM encryption for anything at rest
 │
 ├── storage/            the database, and nothing else
@@ -80,14 +91,16 @@ server/
 │   └── venues/           exchange adapters via CCXT
 │
 ├── market/
-│   └── news.js           market news, fetched and cached server-side
+│   ├── news.js           market news, fetched and cached server-side
+│   ├── gemini.js         AI sentiment extraction
+│   └── sentimentTrack.js forward performance tracking for AI signals
 │
 ├── scripts/            one-off tools, not part of the running server
 ├── __tests__/
 └── data/               runtime database files — gitignored, never source
 ```
 
-**Where to start reading:** `index.js` lists every route in one file. From a
+**Where to start reading:** `app.js` mounts the domain routers, and `routes/` defines each endpoint group. From a
 route you can follow one hop into whichever folder does the work.
 
 **The most important file** is `trading/botEngine.js`. Its `preflight()`

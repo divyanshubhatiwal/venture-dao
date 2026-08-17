@@ -65,17 +65,19 @@ Generate a fresh vault key only for a fresh database:
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-### 3. Backend
+### 3. Backend (Render)
 
-Push, then in Render: **New → Blueprint**, point it at the repo. `render.yaml`
-declares everything except the secrets, which you set in the dashboard.
-
-Then find your service's **static outbound IP** in Render's settings and add it
-to the Delta API key's whitelist.
+1. In Render Dashboard: **New → Web Service** (or **Blueprint** with `backend/render.yaml`).
+2. Point at your repo, and configure:
+   - **Root Directory**: `backend`
+   - **Build Command**: `npm install`
+   - **Start Command**: `npm start`
+   - **Environment**: Set `MONGODB_URI`, `MONGODB_DB`, `DELTA_VAULT_KEY`, `DELTA_API_KEY`, `DELTA_API_SECRET`, `GEMINI_API_KEY`, `CORS_ORIGIN`.
+3. Find your service's **static outbound IP** in Render's settings and add it to your Delta Exchange API key IP whitelist.
 
 ### 4. Verify before trusting it
 
-From the deployed server's shell:
+From the deployed backend server's shell:
 
 ```bash
 npm run preflight
@@ -85,15 +87,17 @@ Read-only — it places nothing. It checks the environment switches, that the ke
 authenticates, that the IP is whitelisted, and that your order caps were set
 deliberately rather than left at defaults.
 
-Do not skip this. The IP whitelist is the single most common failure, and
-Delta's error for it reads like a bad key rather than a network rule.
+### 5. Frontend (Vercel)
 
-### 5. Frontend
-
-Deploy to Vercel with `VITE_API_URL` set to your backend's URL. Then set
-`CORS_ORIGIN` on the backend to your Vercel domain — exactly, no wildcard. The
-session cookie requires `credentials: true`, which is incompatible with a
-wildcard origin.
+1. In Vercel Dashboard: **Add New Project** and select this repository.
+2. In Project Settings:
+   - **Root Directory**: `frontend`
+   - **Framework Preset**: `Vite`
+   - **Build Command**: `npm run build`
+   - **Output Directory**: `dist`
+3. In Environment Variables:
+   - `VITE_API_URL`: `https://your-backend-service.onrender.com` (your Render backend URL)
+4. Deploy! Then update `CORS_ORIGIN` on your Render backend to match your Vercel URL (e.g. `https://venture-dao.vercel.app`).
 
 ---
 

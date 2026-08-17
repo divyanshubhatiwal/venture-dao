@@ -1,19 +1,25 @@
 {
   "name": "venture-dao",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview --port 4173",
+    "dev": "npm run dev --workspace=frontend",
+    "build": "npm run build --workspace=frontend",
+    "preview": "npm run preview --workspace=frontend",
+    "server": "npm run start --workspace=backend",
+    "server:dev": "npm run dev --workspace=backend",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "server": "node server/index.js",
-    "db": "node server/scripts/startMongo.js",
-    "db:migrate": "node server/scripts/migrateSqliteToMongo.js",
-    "preflight": "node server/scripts/preflightLive.js",
-    "db:rename": "node server/scripts/renameDatabase.js"
+    "test:backend": "npm test --workspace=backend",
+    "test:frontend": "npm test --workspace=frontend",
+    "preflight": "npm run preflight --workspace=backend",
+    "db": "npm run db --workspace=backend",
+    "db:migrate": "npm run db:migrate --workspace=backend",
+    "db:rename": "npm run db:rename --workspace=backend"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^6.0.5",
@@ -38,5 +44,5 @@
     "react-router-dom": "^7.18.2",
     "recharts": "^3.10.1"
   },
-  "description": "Venture DAO — React frontend in src/, Express + MongoDB backend in server/"
+  "description": "Venture DAO — Standalone React frontend in frontend/ (Vercel) and Express + MongoDB backend in backend/ (Render)"
 }
