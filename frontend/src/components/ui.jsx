@@ -144,3 +144,51 @@ export function ChartTooltip({ active, payload, label, formatter, suffix = '' })
     </div>
   )
 }
+
+/** Glassmorphic accessible Modal */
+export function Modal({ isOpen, onClose, title, children, maxWidth = 'max-w-lg' }) {
+  if (!isOpen) return null
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="fixed inset-0 bg-black/75 backdrop-blur-sm transition-opacity" onClick={onClose} />
+      <div
+        className={`relative z-10 w-full ${maxWidth} transform overflow-hidden rounded-2xl border border-white/15 bg-ink-900/95 p-6 shadow-2xl backdrop-blur-xl transition-all animate-fade-up`}
+      >
+        {title && (
+          <div className="mb-4 flex items-center justify-between border-b border-white/10 pb-3">
+            <h3 className="text-base font-semibold text-white">{title}</h3>
+            <button
+              onClick={onClose}
+              className="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 hover:text-white"
+              aria-label="Close"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+        {children}
+      </div>
+    </div>
+  )
+}
+
+/** Glowing status badge */
+export function StatusBadge({ status = 'online', text, ping }) {
+  const isOnline = status === 'online'
+  return (
+    <div
+      className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-[11px] font-medium backdrop-blur-md transition ${
+        isOnline
+          ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.15)]'
+          : 'border-amber-500/30 bg-amber-500/10 text-amber-300'
+      }`}
+    >
+      <span className="relative flex h-2 w-2">
+        {isOnline && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />}
+        <span className={`relative inline-flex h-2 w-2 rounded-full ${isOnline ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+      </span>
+      <span>{text || (isOnline ? 'Live API' : 'Connecting')}</span>
+      {ping && <span className="font-mono text-[10px] text-slate-400">{ping}ms</span>}
+    </div>
+  )
+}
